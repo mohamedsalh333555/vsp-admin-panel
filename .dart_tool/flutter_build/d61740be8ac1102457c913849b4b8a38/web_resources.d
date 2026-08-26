@@ -1,1 +1,0 @@
-:  K:\\.gemini\\antigravity\\scratch\\vsp_admin_panel\\web\\index.html

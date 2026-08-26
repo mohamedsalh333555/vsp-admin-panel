@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+build/
+.dart_tool/
 
 # Editor directories and files
 .vscode/*
