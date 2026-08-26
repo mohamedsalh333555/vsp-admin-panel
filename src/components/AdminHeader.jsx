@@ -1,11 +1,28 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Globe, LogOut, ShieldCheck, Crown, Menu } from 'lucide-react';
+import { Globe, LogOut, ShieldCheck, Crown, Menu, Camera, User } from 'lucide-react';
 
 export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) => {
   const { t, toggleLanguage } = useLanguage();
-  const { profile, logout } = useAuth();
+  const { profile, logout, updateAvatar } = useAuth();
+  const fileInputRef = useRef(null);
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Convert to base64 for reliable instant persistence and preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result;
+      updateAvatar(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const avatarUrl = profile?.avatar_url || profile?.profile_image_url;
+  const displayName = profile?.name || profile?.email || 'Admin';
 
   return (
     <header className="bg-vsp-surface border-b border-vsp-border px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -31,10 +48,47 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
         {action}
 
         {profile && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-vsp-card border border-vsp-border rounded-lg text-xs">
-            <Crown className="w-4 h-4 text-amber-400" />
-            <span className="font-semibold text-white">{profile.name || profile.email}</span>
-            <span className="bg-vsp-accentSoft text-vsp-accent px-2 py-0.5 rounded text-[10px] font-bold">
+          <div className="flex items-center gap-3 px-3 py-1.5 bg-vsp-card border border-vsp-border rounded-xl text-xs shadow-sm">
+            {/* Interactive Avatar */}
+            <div className="relative group">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleAvatarChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="تغيير الصورة الشخصية / Change Avatar"
+                className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center relative cursor-pointer group-hover:border-vsp-accent transition-all"
+              >
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-bold text-white bg-gradient-to-br from-zinc-700 to-zinc-900 text-xs">
+                    {displayName.charAt(0)}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <Camera className="w-3.5 h-3.5 text-white" />
+                </div>
+              </button>
+            </div>
+
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="font-bold text-white text-xs">{displayName}</span>
+              </div>
+            </div>
+
+            <span className="bg-amber-400/10 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md text-[10px] font-bold">
               {profile.isCoFounder ? t('cofounder') : t('admin')}
             </span>
           </div>

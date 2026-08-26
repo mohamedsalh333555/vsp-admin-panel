@@ -103,6 +103,24 @@ export const AuthProvider = ({ children }) => {
     return authData;
   };
 
+  const updateAvatar = async (avatarUrl) => {
+    if (!user) return;
+    try {
+      await supabase.from('users').update({
+        avatar_url: avatarUrl,
+        profile_image_url: avatarUrl,
+      }).eq('id', user.id);
+
+      setProfile((prev) => ({
+        ...prev,
+        avatar_url: avatarUrl,
+        profile_image_url: avatarUrl,
+      }));
+    } catch (err) {
+      console.error('Error updating avatar:', err);
+    }
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -110,7 +128,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, register, logout, updateAvatar, fetchUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
