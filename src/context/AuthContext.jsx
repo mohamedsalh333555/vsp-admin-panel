@@ -3,7 +3,12 @@ import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext();
 
-const COFOUNDER_EMAIL = 'mohamedsalh333555@gmail.com';
+const COFOUNDER_EMAILS = [
+  'mohamedsalh333555@gmail.com',
+  'admin@vsp.com',
+  'hana.ramadan@vsp.com',
+  'ceo@vsp.com',
+];
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -37,6 +42,8 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (userId, email) => {
     try {
+      const isCoFounderEmail = COFOUNDER_EMAILS.includes(email?.toLowerCase());
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -44,20 +51,20 @@ export const AuthProvider = ({ children }) => {
         .maybeSingle();
 
       if (data) {
-        const isCoFounder = email === COFOUNDER_EMAIL || data.role === 'cofounder' || data.role === 'co_founder' || email === 'admin@vsp.com';
+        const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
         setProfile({
           ...data,
           isCoFounder,
-          isApprovedAdmin: isCoFounder || data.role === 'admin' || data.role === 'co_founder' || data.role === 'cofounder' || data.is_approved === true || email === 'admin@vsp.com' || email === COFOUNDER_EMAIL,
+          isApprovedAdmin: isCoFounder || data.role === 'admin' || data.is_approved === true,
         });
       } else {
         // Fallback for co-founder
-        const isCoFounder = email === COFOUNDER_EMAIL || email === 'admin@vsp.com';
         setProfile({
           id: userId,
           email,
-          role: isCoFounder ? 'co_founder' : 'admin',
-          isCoFounder,
+          name: email === 'hana.ramadan@vsp.com' ? 'هنا رمضان CEO' : 'محمد صلاح COO',
+          role: 'cofounder',
+          isCoFounder: isCoFounderEmail,
           isApprovedAdmin: true,
         });
       }
