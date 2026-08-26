@@ -109,29 +109,47 @@ const translations = {
 
     // Owner Subscriptions
     owner_subscriptions_title: 'إدارة اشتراكات وباقات الملاك',
-    owner_subscriptions_subtitle: 'التحكم في باقات أصحاب الملاعب، تفعيل اشتراكات الاحتراف، وتحديد الصلاحيات',
+    owner_subscriptions_subtitle: 'التحكم في باقات أصحاب الملاعب، تفعيل وتمديد اشتراكات الاحتراف، ومتابعة الفترات التجريبية',
     filter_all_owners: 'الكل',
     filter_pro_owners: 'باقة الاحتراف',
-    filter_basic_owners: 'الباقة الأساسية',
+    filter_trial_owners: 'فترة تجريبية (شهرين)',
+    filter_basic_owners: 'الفترة التجريبية',
+    filter_expired_owners: 'منتهي الصلاحية',
     owner_col: 'المالك',
     plan_col: 'نوع الباقة',
-    expiry_col: 'تاريخ الانتهاء',
-    capacity_col: 'سعة الملاعب',
+    expiry_col: 'تاريخ الانتهاء والمدة',
+    capacity_col: 'سعة الملاعب المستخدمة',
     plan_pro: 'باقة الاحتراف',
-    plan_basic: 'باقة مجانية',
+    plan_trial: 'فترة تجريبية (شهرين)',
+    plan_basic: 'فترة تجريبية (شهرين)',
     plan_expired: 'منتهي الصلاحية',
-    permanent: 'دائم',
-    unlimited_stadiums: 'ملاعب غير محدودة',
-    single_stadium: 'ملعب واحد فقط',
+    trial_ended: 'انتهت التجربة (شهرين)',
+    permanent: 'فترة تجريبية (شهرين)',
+    days_left: 'متبقي {days} يوم',
+    days_overdue: 'منتهي منذ {days} يوم',
+    today_expires: 'ينتهي اليوم',
+    unlimited_stadiums: 'غير محدود',
+    single_stadium: 'ملعب واحد مسموح',
+    stadiums_usage: '{used} من أصل {limit}',
     extend_pro_btn: 'تمديد باقة الاحتراف',
     upgrade_pro_btn: 'ترقية لباقة الاحتراف',
+    downgrade_pro_btn: 'إلغاء الترقية (إرجاع للتجريبي)',
     pro_modal_title: 'تفعيل وتمديد باقة الاحتراف',
     duration_days: 'مدة التفعيل (بالأيام):',
+    custom_days: 'أو عدد أيام مخصص:',
+    cumulative_notice: 'تمديد تراكمي: ستتم إضافة الأيام الجديدة فوق تاريخ الانتهاء الحالي ({date})',
+    new_activation_notice: 'تفعيل جديد: سيبدأ سريان الباقة من اليوم ولمدة {days} يوماً',
     pro_features_title: 'مميزات باقة الاحتراف:',
     pro_f1: 'إضافة عدد غير محدود من الملاعب للمنشأة',
-    pro_f2: 'تنظيم بطولات وكؤوس خاصة',
-    pro_f3: 'ظهور مميز في نتائج بحث تطبيق اللاعبين',
-    confirm_activate_plan: 'تأكيد تفعيل الباقة',
+    pro_f2: 'تنظيم بطولات وكؤوس خاصة للمنشأة',
+    pro_f3: 'ظهور مميز ومقدم في نتائج بحث تطبيق اللاعبين',
+    confirm_activate_plan: 'تأكيد حفظ وتفعيل الباقة',
+    confirm_downgrade_title: 'إلغاء باقة الاحتراف وإعادة المالك للتجريبي',
+    confirm_downgrade_msg: 'هل أنت متأكد من إلغاء باقة الاحتراف للمالك {name}؟ سيعود الحساب إلى الفترة التجريبية وتقتصر سعة الملاعب على ملعب واحد.',
+    confirm_downgrade_btn: 'تأكيد إلغاء الترقية',
+    subscription_activated_success: 'تم تفعيل باقة الاحتراف للمالك بنجاح',
+    subscription_extended_success: 'تم تمديد باقة الاحتراف بنجاح تراكمياً',
+    subscription_downgraded_success: 'تم إرجاع المالك للفترة التجريبية بنجاح',
 
     // Users Moderation
     users_title: 'إدارة المستخدمين والمشرفين',
@@ -410,29 +428,47 @@ const translations = {
 
     // Owner Subscriptions
     owner_subscriptions_title: 'Owner Subscriptions Management',
-    owner_subscriptions_subtitle: 'Manage owner subscription tiers, activate Pro plans, and assign stadium capacities',
+    owner_subscriptions_subtitle: 'Manage owner subscription tiers, activate & extend Pro plans, and monitor free trials',
     filter_all_owners: 'All',
     filter_pro_owners: 'Pro Plan',
-    filter_basic_owners: 'Basic Plan',
+    filter_trial_owners: 'Free Trial (2 Months)',
+    filter_basic_owners: 'Free Trial',
+    filter_expired_owners: 'Expired',
     owner_col: 'Owner',
     plan_col: 'Subscription Plan',
-    expiry_col: 'Expiry Date',
-    capacity_col: 'Stadium Capacity',
+    expiry_col: 'Expiry Date & Duration',
+    capacity_col: 'Stadium Capacity & Usage',
     plan_pro: 'Pro Plan',
-    plan_basic: 'Basic Plan',
+    plan_trial: 'Free Trial (2 Months)',
+    plan_basic: 'Free Trial (2 Months)',
     plan_expired: 'Expired',
-    permanent: 'Permanent',
-    unlimited_stadiums: 'Unlimited Stadiums',
-    single_stadium: 'Single Stadium Only',
+    trial_ended: 'Trial Ended (2 Months)',
+    permanent: 'Free Trial (2 Months)',
+    days_left: '{days} days left',
+    days_overdue: 'expired {days} days ago',
+    today_expires: 'Expires today',
+    unlimited_stadiums: 'Unlimited',
+    single_stadium: '1 stadium allowed',
+    stadiums_usage: '{used} of {limit}',
     extend_pro_btn: 'Extend Pro Plan',
     upgrade_pro_btn: 'Upgrade to Pro Plan',
+    downgrade_pro_btn: 'Revoke Pro (Return to Trial)',
     pro_modal_title: 'Activate & Extend Pro Plan',
     duration_days: 'Activation Duration (Days):',
+    custom_days: 'Or custom days duration:',
+    cumulative_notice: 'Cumulative extension: new days will be added to the current expiry date ({date})',
+    new_activation_notice: 'New activation: plan will start from today for {days} days',
     pro_features_title: 'Pro Plan Features:',
     pro_f1: 'Add unlimited stadiums under one organization',
-    pro_f2: 'Host and organize private cups and tournaments',
+    pro_f2: 'Host and organize private cups and tournaments for the venue',
     pro_f3: 'Featured listing in player search results',
-    confirm_activate_plan: 'Confirm Plan Activation',
+    confirm_activate_plan: 'Save & Confirm Plan Activation',
+    confirm_downgrade_title: 'Revoke Pro & Return to Trial',
+    confirm_downgrade_msg: 'Are you sure you want to revoke Pro plan for {name}? The account will return to the free trial tier with 1 stadium capacity limit.',
+    confirm_downgrade_btn: 'Confirm Revocation',
+    subscription_activated_success: 'Pro plan activated successfully',
+    subscription_extended_success: 'Pro plan extended cumulatively successfully',
+    subscription_downgraded_success: 'Owner returned to free trial tier successfully',
 
     // Users Moderation
     users_title: 'User & Admin Moderation',
@@ -622,8 +658,14 @@ export const LanguageProvider = ({ children }) => {
     setLang((prev) => (prev === 'ar' ? 'en' : 'ar'));
   };
 
-  const t = (key) => {
-    return translations[lang]?.[key] || key;
+  const t = (key, params = {}) => {
+    let str = translations[lang]?.[key] || key;
+    if (params && typeof params === 'object' && Object.keys(params).length > 0) {
+      Object.keys(params).forEach((p) => {
+        str = str.replace(new RegExp(`\\{${p}\\}`, 'g'), params[p]);
+      });
+    }
+    return str;
   };
 
   return (

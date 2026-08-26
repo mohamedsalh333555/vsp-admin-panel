@@ -231,20 +231,67 @@ class AdminService {
     }
   }
 
+  async fetchOwnersWithSubscriptions({ searchQuery = '' } = {}) {
+    try {
+      let query = this.client
+        .from('users')
+        .select('*')
+        .eq('role', 'owner')
+        .order('created_at', { ascending: false });
+
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.trim();
+        query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
+      }
+
+      const [usersRes, stadiumsRes] = await Promise.all([
+        query,
+        this.client.from('stadiums').select('id, owner_id, name'),
+      ]);
+
+      if (usersRes.error) throw usersRes.error;
+      const owners = usersRes.data || [];
+      const stadiums = stadiumsRes.data || [];
+
+      return owners.map((owner) => {
+        const ownerStadiums = stadiums.filter((s) => s.owner_id === owner.id);
+        return {
+          ...owner,
+          stadiumCount: ownerStadiums.length,
+          stadiumNames: ownerStadiums.map((s) => s.name),
+        };
+      });
+    } catch (e) {
+      console.error('Error in fetchOwnersWithSubscriptions:', e);
+      return [];
+    }
+  }
+
   async activateVspPro({ ownerId, days = 30 }) {
     try {
-      // 1. Try atomic RPC
+      // 1. Check existing subscription to support cumulative extension
+      let baseTime = Date.now();
       try {
-        const { data, error } = await this.client.rpc('activate_vsp_pro', {
-          p_owner_id: ownerId,
-          p_transaction_id: `ADMIN_PRO_${Date.now()}`,
-          p_days: Number(days),
-        });
-        if (!error) return { success: true, data };
-      } catch (_) {}
+        const { data: currentUser } = await this.client
+          .from('users')
+          .select('subscription_plan, subscription_expires_at')
+          .eq('id', ownerId)
+          .maybeSingle();
 
-      // 2. Direct fallback on schema columns
-      const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        if (currentUser?.subscription_plan === 'pro' && currentUser?.subscription_expires_at) {
+          const currentExpiryTime = new Date(currentUser.subscription_expires_at).getTime();
+          if (currentExpiryTime > baseTime) {
+            // Cumulatively add days to the active expiration date
+            baseTime = currentExpiryTime;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('Could not fetch existing subscription date, falling back to Date.now()', fetchErr);
+      }
+
+      const expiresAt = new Date(baseTime + Number(days) * 24 * 60 * 60 * 1000).toISOString();
+
+      // 2. Update user record
       const { error: updateErr } = await this.client
         .from('users')
         .update({
@@ -258,6 +305,25 @@ class AdminService {
       return { success: true, expiresAt };
     } catch (e) {
       console.error('Error in activateVspPro:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async downgradeOwnerToBasic({ ownerId }) {
+    try {
+      const { error } = await this.client
+        .from('users')
+        .update({
+          subscription_plan: 'free_trial',
+          subscription_expires_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ownerId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (e) {
+      console.error('Error in downgradeOwnerToBasic:', e);
       return { success: false, error: e.message };
     }
   }
