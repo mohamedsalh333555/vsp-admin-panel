@@ -882,8 +882,8 @@ class AdminService {
         ownerBookings.forEach((b) => {
           const price = Number(b.total_price || 0);
           const deposit = Number(b.deposit_paid || 0);
-          // Pure platform commission (without external gateway fees)
-          const fee = Number(b.platform_fee ?? (price > 0 ? Math.round(price * 0.05) : 0));
+          // Pure 2% VSP platform commission (without any Paymob fees)
+          const fee = Number(price > 0 ? Math.round(price * 0.02 * 100) / 100 : 0);
 
           grossVolume += price;
           platformCommission += fee;
@@ -905,8 +905,8 @@ class AdminService {
           ownerPayouts.reduce((sum, s) => sum + Number(s.amount || 0), 0) +
           ownerPaidTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        // Net Payable to Owner: Funds collected in platform account minus pure platform commission minus already settled
-        const netBalance = Math.round((onlineCollected - platformCommission - totalPaidOut) * 100) / 100;
+        // Net Payable to Owner: 100% of collected stadium booking funds minus already settled payouts
+        const netBalance = Math.max(0, Math.round((onlineCollected - totalPaidOut) * 100) / 100);
 
         let payoutMethod = null;
         let payoutDestination = null;
