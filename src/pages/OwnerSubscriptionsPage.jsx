@@ -62,8 +62,21 @@ export const OwnerSubscriptionsPage = () => {
   }, [search]);
 
   /**
+   * Calculates precise calendar day difference between today (midnight) and target date (midnight)
+   */
+  const getCalendarDaysDifference = (targetDate) => {
+    if (!targetDate) return 0;
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(targetDate);
+    const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+    const diffMs = targetMidnight.getTime() - todayMidnight.getTime();
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+  };
+
+  /**
    * Evaluates subscription tier, expiration, remaining days, and stadium capacity.
-   * Basic accounts have a 2-month (60 days) free trial from account creation.
+   * Basic accounts have a 2-month free trial from account creation.
    */
   const getOwnerSubscriptionDetails = (owner) => {
     const isPro = owner.subscription_plan === 'pro';
@@ -72,9 +85,8 @@ export const OwnerSubscriptionsPage = () => {
 
     if (isPro && rawExpiresAt) {
       const expiresAt = new Date(rawExpiresAt);
-      const diffMs = expiresAt.getTime() - Date.now();
-      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      const isExpired = diffDays <= 0;
+      const diffDays = getCalendarDaysDifference(expiresAt);
+      const isExpired = diffDays < 0;
 
       return {
         tier: 'pro',
@@ -96,11 +108,14 @@ export const OwnerSubscriptionsPage = () => {
       };
     }
 
-    // Free Trial: 60 Days (شهرين) from created_at
-    const trialExpiresAt = new Date(createdAt.getTime() + 60 * 24 * 60 * 60 * 1000);
-    const diffMs = trialExpiresAt.getTime() - Date.now();
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    const isExpired = diffDays <= 0;
+    // Free Trial: 2 calendar months from created_at
+    const trialExpiresAt = new Date(
+      createdAt.getFullYear(),
+      createdAt.getMonth() + 2,
+      createdAt.getDate()
+    );
+    const diffDays = getCalendarDaysDifference(trialExpiresAt);
+    const isExpired = diffDays < 0;
 
     return {
       tier: 'trial',
@@ -427,10 +442,10 @@ export const OwnerSubscriptionsPage = () => {
 
                       <td className="px-6 py-4">
                         <div className="space-y-0.5">
-                          <div className="font-mono text-[11px] text-zinc-200">
+                          <div className="font-bold text-[12px] text-zinc-200">
                             {details.expiresAt.toLocaleDateString(
                               lang === 'ar' ? 'ar-EG' : 'en-US',
-                              { year: 'numeric', month: 'numeric', day: 'numeric' }
+                              { day: 'numeric', month: 'short', year: 'numeric' }
                             )}
                           </div>
                           <div
