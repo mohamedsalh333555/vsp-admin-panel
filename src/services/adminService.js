@@ -882,14 +882,16 @@ class AdminService {
         ownerBookings.forEach((b) => {
           const price = Number(b.total_price || 0);
           const deposit = Number(b.deposit_paid || 0);
-          // Pure 2% VSP platform commission (without any Paymob fees)
-          const fee = Number(price > 0 ? Math.round(price * 0.02 * 100) / 100 : 0);
+          const isOnline = b.is_deposit_paid || deposit > 0 || b.paymob_transaction_id;
+          const collected = deposit > 0 ? deposit : price;
 
           grossVolume += price;
-          platformCommission += fee;
 
-          if (b.is_deposit_paid || deposit > 0 || b.paymob_transaction_id) {
-            onlineCollected += deposit > 0 ? deposit : price;
+          if (isOnline) {
+            onlineCollected += collected;
+            // Pure 2% platform commission ONLY on online collected bookings
+            const fee = Math.round(collected * 0.02 * 100) / 100;
+            platformCommission += fee;
           }
         });
 
