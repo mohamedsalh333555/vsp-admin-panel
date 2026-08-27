@@ -21,11 +21,12 @@ import {
   Smartphone,
   Check,
   Send,
-  ArrowUpRight,
+  AlertCircle,
+  Wallet,
 } from 'lucide-react';
 
 export const PayoutSettlementsPage = () => {
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('matrix'); // 'matrix' | 'ledger' | 'requests'
   const [search, setSearch] = useState('');
@@ -37,6 +38,7 @@ export const PayoutSettlementsPage = () => {
     settlements: [],
     kpis: {
       totalGrossSystemVolume: 0,
+      totalOnlineCollected: 0,
       totalPlatformRevenue: 0,
       totalPendingOwnerDues: 0,
       totalSettledPayouts: 0,
@@ -78,8 +80,8 @@ export const PayoutSettlementsPage = () => {
 
   const openSettlementModal = (owner) => {
     setSelectedOwner(owner);
-    const dest = owner.p2p_vodafone || owner.p2p_instapay || owner.phone || '';
-    const meth = owner.p2p_instapay ? 'instapay' : 'vodafone_cash';
+    const dest = owner.payoutDestination || owner.phone || '';
+    const meth = owner.payoutMethod || (owner.p2p_instapay ? 'instapay' : 'vodafone_cash');
     setSettlementForm({
       amount: owner.netBalance > 0 ? owner.netBalance : '',
       method: meth,
@@ -105,7 +107,7 @@ export const PayoutSettlementsPage = () => {
       });
 
       if (res.success) {
-        showToast(t('save_booking_success'));
+        showToast(t('settlement_success'));
         setSelectedOwner(null);
         loadFinancials();
       } else {
@@ -130,6 +132,7 @@ export const PayoutSettlementsPage = () => {
       t('phone'),
       t('governorate'),
       t('gross_volume_col'),
+      t('online_collected_col'),
       t('platform_fee_col'),
       t('settled_payouts_col'),
       t('net_withdrawable_col'),
@@ -139,6 +142,7 @@ export const PayoutSettlementsPage = () => {
       `"${o.phone}"`,
       `"${o.governorate}"`,
       o.grossVolume,
+      o.onlineVolume,
       o.platformCommission,
       o.totalPaidOut,
       o.netBalance,
@@ -201,37 +205,38 @@ export const PayoutSettlementsPage = () => {
             onClick={loadFinancials}
             disabled={loading}
             className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-zinc-400 hover:text-white rounded-xl transition-all disabled:opacity-50"
+            title={t('refresh_data')}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Financial KPI Matrix */}
+      {/* Financial Executive KPI Matrix */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label={t('kpi_gross_volume')}
-          value={`${Number(financialData.kpis.totalGrossSystemVolume).toLocaleString()} ${t('currency')}`}
-          icon={TrendingUp}
-          subtext={t('kpi_revenue_subtext')}
+          label={t('kpi_online_collected')}
+          value={`${Number(financialData.kpis.totalOnlineCollected || 0).toLocaleString()} ${t('currency')}`}
+          icon={Wallet}
+          subtext={t('kpi_online_subtext')}
         />
         <StatCard
           label={t('kpi_platform_commission')}
-          value={`${Number(financialData.kpis.totalPlatformRevenue).toLocaleString()} ${t('currency')}`}
+          value={`${Number(financialData.kpis.totalPlatformRevenue || 0).toLocaleString()} ${t('currency')}`}
           icon={DollarSign}
-          subtext={t('kpi_revenue_subtext')}
+          subtext={t('kpi_platform_subtext')}
         />
         <StatCard
           label={t('kpi_pending_dues')}
-          value={`${Number(financialData.kpis.totalPendingOwnerDues).toLocaleString()} ${t('currency')}`}
+          value={`${Number(financialData.kpis.totalPendingOwnerDues || 0).toLocaleString()} ${t('currency')}`}
           icon={Clock}
-          subtext={t('kpi_users_subtext')}
+          subtext={t('kpi_pending_subtext')}
         />
         <StatCard
           label={t('kpi_total_settled')}
-          value={`${Number(financialData.kpis.totalSettledPayouts).toLocaleString()} ${t('currency')}`}
+          value={`${Number(financialData.kpis.totalSettledPayouts || 0).toLocaleString()} ${t('currency')}`}
           icon={CheckCircle2}
-          subtext={t('kpi_bookings_subtext')}
+          subtext={t('kpi_settled_subtext')}
         />
       </div>
 
@@ -274,13 +279,15 @@ export const PayoutSettlementsPage = () => {
 
         {activeTab === 'matrix' && (
           <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-zinc-500 absolute right-3.5 top-1/2 -translate-y-1/2" />
+            <Search className={`w-4 h-4 text-zinc-500 absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3.5' : 'left-3.5'}`} />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('search')}
-              className="w-full bg-vsp-surface border border-vsp-border rounded-xl pr-10 pl-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+              className={`w-full bg-vsp-surface border border-vsp-border rounded-xl py-2 text-xs text-white placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none ${
+                isRTL ? 'pr-10 pl-4 text-right' : 'pl-10 pr-4 text-left'
+              }`}
             />
           </div>
         )}
@@ -308,6 +315,7 @@ export const PayoutSettlementsPage = () => {
                     <th className="px-6 py-4 font-bold">{t('owner_statement_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('transfer_method')}</th>
                     <th className="px-6 py-4 font-bold">{t('gross_volume_col')}</th>
+                    <th className="px-6 py-4 font-bold">{t('online_collected_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('platform_fee_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('settled_payouts_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('net_withdrawable_col')}</th>
@@ -316,7 +324,8 @@ export const PayoutSettlementsPage = () => {
                 </thead>
                 <tbody className="divide-y divide-vsp-border/50">
                   {filteredOwners.map((owner) => {
-                    const isPositive = owner.netBalance > 0;
+                    const isDue = owner.netBalance > 0;
+                    const isZero = owner.netBalance === 0;
 
                     return (
                       <tr key={owner.ownerId} className="hover:bg-vsp-card/30 transition-colors">
@@ -325,7 +334,7 @@ export const PayoutSettlementsPage = () => {
                             <div className="font-bold text-white text-sm">{owner.name || '-'}</div>
                             <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
                               {owner.phone}
-                              {owner.stadiumNames && !owner.stadiumNames.match(/^\d+$/) && (
+                              {owner.stadiumNames && (
                                 <span> • {owner.stadiumNames}</span>
                               )}
                             </div>
@@ -334,16 +343,22 @@ export const PayoutSettlementsPage = () => {
 
                         <td className="px-6 py-4">
                           <div className="text-[11px] font-mono text-zinc-300">
-                            {owner.p2p_instapay ? (
-                              <span className="bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-md text-zinc-200 inline-block">
-                                {t('instapay')}: {owner.p2p_instapay}
-                              </span>
-                            ) : owner.p2p_vodafone ? (
-                              <span className="bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-md text-zinc-200 inline-block">
-                                {t('vodafone_cash')}: {owner.p2p_vodafone}
+                            {owner.payoutDestination ? (
+                              <span className="bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-md text-zinc-200 inline-flex items-center gap-1">
+                                {owner.payoutMethod === 'instapay' ? (
+                                  <span className="text-sky-400 font-bold">{t('instapay')}:</span>
+                                ) : owner.payoutMethod === 'vodafone_cash' ? (
+                                  <span className="text-rose-400 font-bold">{t('vodafone_cash')}:</span>
+                                ) : (
+                                  <span className="text-emerald-400 font-bold">{t('bank_transfer')}:</span>
+                                )}
+                                <span>{owner.payoutDestination}</span>
                               </span>
                             ) : (
-                              <span className="text-zinc-500 font-mono">{owner.phone || '-'}</span>
+                              <span className="text-zinc-500 italic flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-amber-400" />
+                                <span>{t('no_destination_registered')}</span>
+                              </span>
                             )}
                           </div>
                         </td>
@@ -358,7 +373,13 @@ export const PayoutSettlementsPage = () => {
                         </td>
 
                         <td className="px-6 py-4">
-                          <span className="font-semibold text-zinc-300">
+                          <span className="font-bold text-emerald-400 font-mono">
+                            {Number(owner.onlineVolume || 0).toLocaleString()} {t('currency')}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-zinc-300 font-mono">
                             {Number(owner.platformCommission || 0).toLocaleString()} {t('currency')}
                           </span>
                         </td>
@@ -373,31 +394,39 @@ export const PayoutSettlementsPage = () => {
                           <div className="flex items-center gap-2">
                             <span
                               className={`text-sm font-black font-mono ${
-                                isPositive ? 'text-white' : 'text-zinc-500'
+                                isDue ? 'text-white' : 'text-zinc-500'
                               }`}
                             >
                               {Number(owner.netBalance || 0).toLocaleString()} {t('currency')}
                             </span>
-                            {isPositive && (
+                            {isDue ? (
                               <Badge variant="success" size="xs">
-                                {t('pending')}
+                                {t('ready_for_payout')}
+                              </Badge>
+                            ) : isZero ? (
+                              <Badge variant="default" size="xs">
+                                {t('no_dues')}
+                              </Badge>
+                            ) : (
+                              <Badge variant="danger" size="xs">
+                                {t('negative_due')}
                               </Badge>
                             )}
                           </div>
                         </td>
 
                         <td className="px-6 py-4 text-center">
-                          {isPositive ? (
+                          {isDue ? (
                             <button
                               onClick={() => openSettlementModal(owner)}
                               className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 hover:border-zinc-500 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 mx-auto"
                             >
-                              <Check className="w-3.5 h-3.5 text-vsp-accent" />
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
                               <span>{t('settle_now_btn')}</span>
                             </button>
                           ) : (
                             <span className="text-xs text-zinc-600 font-medium">
-                              {t('completed')}
+                              {t('no_dues')}
                             </span>
                           )}
                         </td>
@@ -459,12 +488,7 @@ export const PayoutSettlementsPage = () => {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-zinc-400 font-mono text-[11px]">
-                        {tx.created_at
-                          ? new Date(tx.created_at).toLocaleString(t('lang_button') === 'English' ? 'ar-EG' : 'en-US', {
-                              dateStyle: 'short',
-                              timeStyle: 'short',
-                            })
-                          : '-'}
+                        {tx.created_at ? new Date(tx.created_at).toLocaleString() : '-'}
                       </td>
                     </tr>
                   ))}
@@ -474,11 +498,11 @@ export const PayoutSettlementsPage = () => {
           )}
         </div>
       ) : (
-        /* TAB 3: WITHDRAWAL REQUESTS */
+        /* TAB 3: SETTLEMENTS AUDIT TRAIL */
         <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
           {financialData.settlements.length === 0 ? (
             <EmptyState
-              icon={CreditCard}
+              icon={CheckCircle2}
               title={t('no_data')}
               subtitle=""
             />
@@ -487,35 +511,36 @@ export const PayoutSettlementsPage = () => {
               <table className="w-full text-right text-xs">
                 <thead className="bg-vsp-card/50 text-vsp-textSecondary border-b border-vsp-border">
                   <tr>
-                    <th className="px-6 py-4 font-bold">{t('owner_col')}</th>
+                    <th className="px-6 py-4 font-bold">{t('owner_statement_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('booking_total_price')}</th>
                     <th className="px-6 py-4 font-bold">{t('transfer_method')}</th>
-                    <th className="px-6 py-4 font-bold">{t('wallet_number_account')}</th>
+                    <th className="px-6 py-4 font-bold">{t('reference_number')}</th>
                     <th className="px-6 py-4 font-bold">{t('status')}</th>
                     <th className="px-6 py-4 font-bold">{t('date')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-vsp-border/50">
-                  {financialData.settlements.map((s) => (
-                    <tr key={s.id} className="hover:bg-vsp-card/30 transition-colors">
-                      <td className="px-6 py-4 font-bold text-white">{s.users?.name || '-'}</td>
-                      <td className="px-6 py-4 font-black text-white text-sm">
-                        {Number(s.amount || 0).toLocaleString()} {t('currency')}
+                  {financialData.settlements.map((set) => (
+                    <tr key={set.id} className="hover:bg-vsp-card/30 transition-colors">
+                      <td className="px-6 py-4 font-bold text-white">
+                        {set.users?.name || set.owner_name || 'صاحب ملعب'}
                       </td>
-                      <td className="px-6 py-4 text-vsp-textSecondary">{s.method || '-'}</td>
-                      <td className="px-6 py-4 font-mono text-zinc-400">{s.destination || '-'}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-emerald-400">
+                        {Number(set.amount || 0).toLocaleString()} {t('currency')}
+                      </td>
+                      <td className="px-6 py-4 text-vsp-textSecondary">
+                        {set.payment_method || '-'}
+                      </td>
+                      <td className="px-6 py-4 font-mono text-zinc-400">
+                        {set.reference_number || '-'}
+                      </td>
                       <td className="px-6 py-4">
-                        <Badge
-                          variant={s.status === 'paid' || s.status === 'completed' ? 'success' : 'warning'}
-                          size="xs"
-                        >
-                          {s.status === 'paid' || s.status === 'completed' ? t('completed') : t('pending')}
+                        <Badge variant="success" size="xs">
+                          {t('completed')}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 font-mono text-zinc-400 text-[11px]">
-                        {s.created_at
-                          ? new Date(s.created_at).toLocaleDateString(t('lang_button') === 'English' ? 'ar-EG' : 'en-US')
-                          : '-'}
+                        {set.created_at ? new Date(set.created_at).toLocaleString() : '-'}
                       </td>
                     </tr>
                   ))}
@@ -526,7 +551,7 @@ export const PayoutSettlementsPage = () => {
         </div>
       )}
 
-      {/* Smart Payout & Settlement Modal */}
+      {/* Smart Payout Execution Modal */}
       <Modal
         isOpen={Boolean(selectedOwner)}
         onClose={() => setSelectedOwner(null)}
@@ -535,43 +560,46 @@ export const PayoutSettlementsPage = () => {
       >
         {selectedOwner && (
           <form onSubmit={handleExecuteSettlement} className="space-y-4">
-            {/* Owner Info Box */}
-            <div className="p-3.5 bg-vsp-card border border-vsp-border rounded-xl space-y-1.5 text-xs">
+            <div className="p-4 bg-vsp-card border border-vsp-border rounded-xl">
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400">{t('owner_col')}:</span>
-                <span className="font-bold text-white text-sm">{selectedOwner.name}</span>
-              </div>
-              <div className="flex items-center justify-between pt-1 border-t border-vsp-border/50">
-                <span className="text-zinc-400">{t('net_withdrawable_col')}:</span>
-                <span className="font-black text-white text-sm">
-                  {selectedOwner.netBalance.toLocaleString()} {t('currency')}
-                </span>
+                <div>
+                  <div className="text-xs text-vsp-textSecondary">{t('owner_statement_col')}:</div>
+                  <div className="font-bold text-white text-base mt-0.5">{selectedOwner.name}</div>
+                  <div className="text-xs text-zinc-400 font-mono mt-0.5">{selectedOwner.phone}</div>
+                </div>
+                <div className="text-left">
+                  <div className="text-xs text-vsp-textSecondary">{t('net_withdrawable_col')}:</div>
+                  <div className="text-lg font-black text-emerald-400 font-mono mt-0.5">
+                    {Number(selectedOwner.netBalance || 0).toLocaleString()} {t('currency')}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Amount */}
             <div>
-              <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+              <label className="block text-xs font-bold text-vsp-textSecondary mb-1.5">
                 {t('amount_to_transfer')}
               </label>
               <input
                 type="number"
+                step="0.01"
                 required
+                max={selectedOwner.netBalance}
                 value={settlementForm.amount}
                 onChange={(e) => setSettlementForm({ ...settlementForm, amount: e.target.value })}
-                className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-zinc-500 focus:outline-none font-bold"
-                placeholder="250"
+                className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
               />
             </div>
 
-            {/* Method & Destination */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1.5">{t('transfer_method')}</label>
+                <label className="block text-xs font-bold text-vsp-textSecondary mb-1.5">
+                  {t('transfer_method')}
+                </label>
                 <select
                   value={settlementForm.method}
                   onChange={(e) => setSettlementForm({ ...settlementForm, method: e.target.value })}
-                  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-zinc-500 focus:outline-none"
+                  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500"
                 >
                   <option value="vodafone_cash">{t('vodafone_cash')}</option>
                   <option value="instapay">{t('instapay')}</option>
@@ -581,7 +609,7 @@ export const PayoutSettlementsPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                <label className="block text-xs font-bold text-vsp-textSecondary mb-1.5">
                   {t('wallet_number_account')}
                 </label>
                 <input
@@ -589,15 +617,14 @@ export const PayoutSettlementsPage = () => {
                   required
                   value={settlementForm.destination}
                   onChange={(e) => setSettlementForm({ ...settlementForm, destination: e.target.value })}
-                  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-zinc-500 focus:outline-none font-mono"
-                  placeholder="010XXXXXXXX"
+                  placeholder="01XXXXXXXXX / username@instapay"
+                  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
                 />
               </div>
             </div>
 
-            {/* Reference Number */}
             <div>
-              <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+              <label className="block text-xs font-bold text-vsp-textSecondary mb-1.5">
                 {t('reference_number')}
               </label>
               <input
@@ -605,26 +632,28 @@ export const PayoutSettlementsPage = () => {
                 required
                 value={settlementForm.referenceNumber}
                 onChange={(e) => setSettlementForm({ ...settlementForm, referenceNumber: e.target.value })}
-                className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-zinc-500 focus:outline-none font-mono"
-                placeholder="TXN_987654"
+                className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
               />
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-vsp-border">
+            <div className="flex items-center gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setSelectedOwner(null)}
-                className="px-4 py-2.5 bg-vsp-card hover:bg-vsp-border text-zinc-300 hover:text-white border border-vsp-border rounded-xl text-xs font-bold transition-all"
+                className="flex-1 py-2.5 bg-vsp-card hover:bg-vsp-border text-zinc-300 hover:text-white rounded-xl text-xs font-bold transition-all"
               >
                 {t('cancel')}
               </button>
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="px-5 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50"
+                className="flex-1 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {isProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
                 <span>{t('confirm_payout_btn')}</span>
               </button>
             </div>

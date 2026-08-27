@@ -867,35 +867,29 @@ class AdminService {
       const transactions = txRes.data || [];
       const settlements = payoutsRes.data || [];
 
-      // Map stadium owner IDs
-      const stadiumOwnerMap = {};
-      const stadiumNameMap = {};
-      stadiums.forEach((s) => {
-        stadiumOwnerMap[s.id] = s.owner_id;
-        stadiumNameMap[s.id] = s.name;
-      });
-
       // Calculate aggregated metrics per owner
       const ownerMatrix = owners.map((owner) => {
         const ownerStadiums = stadiums.filter((s) => s.owner_id === owner.id);
         const stadiumIds = new Set(ownerStadiums.map((s) => s.id));
-        const ownerBookings = bookings.filter((b) => stadiumIds.has(b.stadium_id) && (b.status === 'confirmed' || b.status === 'completed'));
+        const ownerBookings = bookings.filter(
+          (b) => stadiumIds.has(b.stadium_id) && (b.status === 'confirmed' || b.status === 'completed')
+        );
 
-        // Online Paid vs Cash Paid
-        let onlineVolume = 0;
-        let cashVolume = 0;
-        let totalPlatformCommission = 0;
+        let grossVolume = 0;
+        let onlineCollected = 0;
+        let platformCommission = 0;
 
         ownerBookings.forEach((b) => {
           const price = Number(b.total_price || 0);
           const deposit = Number(b.deposit_paid || 0);
-          const fee = Number(b.platform_fee || (price > 0 ? Math.round(price * 0.05) : 15)); // 5% default VSP platform fee
-          totalPlatformCommission += fee;
+          // Pure platform commission (without external gateway fees)
+          const fee = Number(b.platform_fee ?? (price > 0 ? Math.round(price * 0.05) : 0));
+
+          grossVolume += price;
+          platformCommission += fee;
 
           if (b.is_deposit_paid || deposit > 0 || b.paymob_transaction_id) {
-            onlineVolume += deposit > 0 ? deposit : price;
-          } else {
-            cashVolume += price;
+            onlineCollected += deposit > 0 ? deposit : price;
           }
         });
 
@@ -911,38 +905,40 @@ class AdminService {
           ownerPayouts.reduce((sum, s) => sum + Number(s.amount || 0), 0) +
           ownerPaidTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        // Net Withdrawable Balance: Online volume collected by VSP minus platform fees minus already paid payouts
-        const netBalance = onlineVolume - totalPlatformCommission - totalPaidOut;
+        // Net Payable to Owner: Funds collected in platform account minus pure platform commission minus already settled
+        const netBalance = Math.round((onlineCollected - platformCommission - totalPaidOut) * 100) / 100;
 
-        const preferredMethod = owner.p2p_vodafone
-          ? 'vodafone_cash'
-          : owner.p2p_instapay
-          ? 'instapay'
-          : owner.p2p_bank
-          ? 'bank_transfer'
-          : 'vodafone_cash';
+        let payoutMethod = null;
+        let payoutDestination = null;
 
-        const preferredDestination =
-          owner.p2p_vodafone || owner.p2p_instapay || owner.p2p_bank || owner.phone || 'غير مسجل';
+        if (owner.p2p_vodafone && owner.p2p_vodafone.trim()) {
+          payoutMethod = 'vodafone_cash';
+          payoutDestination = owner.p2p_vodafone.trim();
+        } else if (owner.p2p_instapay && owner.p2p_instapay.trim()) {
+          payoutMethod = 'instapay';
+          payoutDestination = owner.p2p_instapay.trim();
+        } else if (owner.p2p_bank && owner.p2p_bank.trim()) {
+          payoutMethod = 'bank_transfer';
+          payoutDestination = owner.p2p_bank.trim();
+        }
 
         return {
           ownerId: owner.id,
-          name: owner.name || 'مالك ملعب',
+          name: owner.name || 'صاحب ملعب',
           phone: owner.phone || 'غير مسجل',
           email: owner.email,
           governorate: owner.governorate || 'غير محدد',
           stadiumCount: ownerStadiums.length,
           stadiumNames: ownerStadiums.map((s) => s.name).join(', ') || 'ملعب رئيسي',
           completedBookingsCount: ownerBookings.length,
-          grossVolume: onlineVolume + cashVolume,
-          onlineVolume,
-          cashVolume,
-          platformCommission: totalPlatformCommission,
+          grossVolume,
+          onlineVolume: onlineCollected,
+          platformCommission,
           totalPaidOut,
           netBalance,
-          isDueToOwner: netBalance >= 0,
-          preferredMethod,
-          preferredDestination,
+          isDueToOwner: netBalance > 0,
+          payoutMethod,
+          payoutDestination,
           p2p_vodafone: owner.p2p_vodafone,
           p2p_instapay: owner.p2p_instapay,
           p2p_bank: owner.p2p_bank,
@@ -950,10 +946,8 @@ class AdminService {
       });
 
       // Overall System Financial KPIs
-      const totalGrossSystemVolume = bookings
-        .filter((b) => b.status === 'confirmed' || b.status === 'completed')
-        .reduce((sum, b) => sum + Number(b.total_price || 0), 0);
-
+      const totalGrossSystemVolume = ownerMatrix.reduce((sum, o) => sum + o.grossVolume, 0);
+      const totalOnlineCollected = ownerMatrix.reduce((sum, o) => sum + o.onlineVolume, 0);
       const totalPlatformRevenue = ownerMatrix.reduce((sum, o) => sum + o.platformCommission, 0);
       const totalPendingOwnerDues = ownerMatrix
         .filter((o) => o.netBalance > 0)
@@ -966,6 +960,7 @@ class AdminService {
         settlements,
         kpis: {
           totalGrossSystemVolume,
+          totalOnlineCollected,
           totalPlatformRevenue,
           totalPendingOwnerDues,
           totalSettledPayouts,
@@ -979,6 +974,7 @@ class AdminService {
         settlements: [],
         kpis: {
           totalGrossSystemVolume: 0,
+          totalOnlineCollected: 0,
           totalPlatformRevenue: 0,
           totalPendingOwnerDues: 0,
           totalSettledPayouts: 0,
