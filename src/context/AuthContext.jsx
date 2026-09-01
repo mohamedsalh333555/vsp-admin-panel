@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 
 const AuthContext = createContext();
 
@@ -42,9 +42,11 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (userId, email) => {
     try {
-      const isCoFounderEmail = COFOUNDER_EMAILS.includes(email?.toLowerCase());
+      const normalizedEmail = (email || '').toLowerCase().trim();
+      const isCoFounderEmail = COFOUNDER_EMAILS.includes(normalizedEmail);
 
-      const { data, error } = await supabase
+      const dbClient = supabaseAdmin || supabase;
+      const { data, error } = await dbClient
         .from('users')
         .select('*')
         .eq('id', userId)
@@ -52,20 +54,21 @@ export const AuthProvider = ({ children }) => {
 
       if (data) {
         const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
+        const isApprovedAdmin = isCoFounder || data.role === 'admin' || data.role === 'super_admin' || data.verification_status === 'approved';
         setProfile({
           ...data,
           isCoFounder,
-          isApprovedAdmin: isCoFounder || data.role === 'admin' || data.is_approved === true,
+          isApprovedAdmin,
         });
       } else {
-        // Fallback for co-founder
+        // Fallback for co-founder or new account
         setProfile({
           id: userId,
-          email,
-          name: email === 'hana.ramadan@vsp.com' ? 'هنا رمضان CEO' : 'محمد صلاح COO',
-          role: 'cofounder',
+          email: normalizedEmail,
+          name: normalizedEmail === 'hana.ramadan@vsp.com' ? 'هنا رمضان CEO' : 'محمد صلاح COO',
+          role: isCoFounderEmail ? 'cofounder' : 'admin',
           isCoFounder: isCoFounderEmail,
-          isApprovedAdmin: true,
+          isApprovedAdmin: isCoFounderEmail,
         });
       }
     } catch (err) {
@@ -77,9 +80,16 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) {
       setLoading(false);
+      if (error.message === 'Invalid login credentials') {
+        throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+      }
+      if (error.message.includes('Email not confirmed')) {
+        throw new Error('يرجى تأكيد البريد الإلكتروني أو مراجعة إدارة المنظومة');
+      }
       throw error;
     }
     return data;
@@ -87,40 +97,85 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, phone, email, password) => {
     setLoading(true);
-    const isCoFounder = email === COFOUNDER_EMAIL;
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
-    if (authError) {
-      setLoading(false);
-      throw authError;
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    const isCoFounder = COFOUNDER_EMAILS.includes(normalizedEmail);
+
+    let authUser = null;
+
+    // 1. Try creating confirmed user directly with admin service (instant activation)
+    try {
+      if (supabaseAdmin?.auth?.admin) {
+        const { data: adminCreated, error: adminErr } = await supabaseAdmin.auth.admin.createUser({
+          email: normalizedEmail,
+          password,
+          email_confirm: true,
+          user_metadata: { name, phone },
+        });
+
+        if (!adminErr && adminCreated?.user) {
+          authUser = adminCreated.user;
+        }
+      }
+    } catch (e) {
+      console.warn('Admin createUser fallback to signUp:', e);
     }
 
-    if (authData?.user) {
-      await supabase.from('users').upsert({
-        id: authData.user.id,
-        name,
-        phone,
-        email,
-        role: isCoFounder ? 'cofounder' : 'pending_admin',
-        is_approved: isCoFounder,
-        status: 'active',
+    // 2. Fallback to standard signUp
+    if (!authUser) {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: { name, phone },
+        },
       });
+
+      if (authError) {
+        setLoading(false);
+        if (authError.message.includes('already registered')) {
+          throw new Error('هذا البريد الإلكتروني مسجل بالفعل، يمكنك تسجيل الدخول مباشرة');
+        }
+        throw authError;
+      }
+      authUser = authData?.user;
+    }
+
+    // 3. Upsert user record in database using actual schema
+    if (authUser) {
+      const dbClient = supabaseAdmin || supabase;
+      await dbClient.from('users').upsert({
+        id: authUser.id,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: normalizedEmail,
+        role: isCoFounder ? 'cofounder' : 'admin',
+        verification_status: isCoFounder ? 'approved' : 'pending',
+        is_identity_verified: isCoFounder,
+        is_blocked: false,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Auto sign-in
+      try {
+        await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+      } catch (_) {}
     }
 
     setLoading(false);
-    return authData;
+    return authUser;
   };
 
   const updateAvatar = async (avatarUrl) => {
     if (!user) return;
     try {
-      await supabase.from('users').update({
-        avatar_url: avatarUrl,
+      const dbClient = supabaseAdmin || supabase;
+      await dbClient.from('users').update({
         profile_image_url: avatarUrl,
+        updated_at: new Date().toISOString(),
       }).eq('id', user.id);
 
       setProfile((prev) => ({
         ...prev,
-        avatar_url: avatarUrl,
         profile_image_url: avatarUrl,
       }));
     } catch (err) {
@@ -142,3 +197,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
