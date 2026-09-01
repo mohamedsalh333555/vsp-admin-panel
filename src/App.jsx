@@ -12,6 +12,7 @@ import { DisputesPage } from './pages/DisputesPage';
 import { PayoutSettlementsPage } from './pages/PayoutSettlementsPage';
 import { League1v1Page } from './pages/League1v1Page';
 import { TournamentControlPage } from './pages/TournamentControlPage';
+import { BannersManagementPage } from './pages/BannersManagementPage';
 import { CRMSettingsPage } from './pages/CRMSettingsPage';
 import { Clock, LogOut, Loader2 } from 'lucide-react';
 
@@ -74,6 +75,8 @@ export default function App() {
         return <League1v1Page />;
       case 'tournaments':
         return <TournamentControlPage />;
+      case 'banners':
+        return <BannersManagementPage />;
       case 'settings':
         return <CRMSettingsPage />;
       default:
@@ -99,6 +102,8 @@ export default function App() {
         return t('league_1v1');
       case 'tournaments':
         return t('tournaments');
+      case 'banners':
+        return t('banners');
       case 'settings':
         return t('settings');
       default:

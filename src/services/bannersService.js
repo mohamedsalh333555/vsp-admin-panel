@@ -1,0 +1,226 @@
+import { supabase, supabaseAdmin } from '../lib/supabase';
+
+class BannersService {
+  get client() {
+    return supabaseAdmin || supabase;
+  }
+
+  /**
+   * Upload an image file to Supabase Storage in the 'banners' bucket
+   * @param {File} file 
+   * @returns {Promise<{success: boolean, url?: string, error?: string}>}
+   */
+  async uploadBannerImage(file) {
+    try {
+      if (!file) throw new Error('No file provided');
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const filePath = `banner_images/${fileName}`;
+
+      const { data, error } = await this.client.storage
+        .from('banners')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        throw error;
+      }
+
+      const { data: publicUrlData } = this.client.storage
+        .from('banners')
+        .getPublicUrl(filePath);
+
+      return {
+        success: true,
+        url: publicUrlData.publicUrl,
+        filePath,
+      };
+    } catch (e) {
+      console.error('Error uploading banner image:', e);
+      return { success: false, error: e.message || 'Failed to upload image' };
+    }
+  }
+
+  /**
+   * Fetch all banners with optional placement/status filters
+   */
+  async fetchBanners({ placement = 'all', status = 'all' } = {}) {
+    try {
+      let query = this.client
+        .from('banners')
+        .select('*')
+        .order('priority_order', { ascending: true })
+        .order('created_at', { ascending: false });
+
+      if (placement && placement !== 'all') {
+        query = query.eq('placement', placement);
+      }
+
+      if (status === 'active') {
+        query = query.eq('is_active', true);
+      } else if (status === 'inactive') {
+        query = query.eq('is_active', false);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return { success: true, data: data || [] };
+    } catch (e) {
+      console.error('Error fetching banners:', e);
+      return { success: false, error: e.message, data: [] };
+    }
+  }
+
+  /**
+   * Fetch aggregate statistics for banners KPI cards
+   */
+  async fetchBannerStats() {
+    try {
+      const { data, error } = await this.client
+        .from('banners')
+        .select('id, is_active, start_date, end_date, clicks_count, views_count');
+
+      if (error) throw error;
+
+      const now = new Date();
+      let totalBanners = data?.length || 0;
+      let activeBanners = 0;
+      let totalClicks = 0;
+      let totalViews = 0;
+
+      data?.forEach((b) => {
+        totalClicks += b.clicks_count || 0;
+        totalViews += b.views_count || 0;
+
+        const isCurrentlyValid =
+          b.is_active &&
+          (!b.start_date || new Date(b.start_date) <= now) &&
+          (!b.end_date || new Date(b.end_date) >= now);
+
+        if (isCurrentlyValid) {
+          activeBanners++;
+        }
+      });
+
+      return {
+        success: true,
+        stats: {
+          totalBanners,
+          activeBanners,
+          totalClicks,
+          totalViews,
+          ctr: totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(1) : '0.0',
+        },
+      };
+    } catch (e) {
+      console.error('Error in fetchBannerStats:', e);
+      return {
+        success: false,
+        stats: { totalBanners: 0, activeBanners: 0, totalClicks: 0, totalViews: 0, ctr: '0.0' },
+      };
+    }
+  }
+
+  /**
+   * Create a new banner record
+   */
+  async createBanner(bannerData) {
+    try {
+      const payload = {
+        title: bannerData.title,
+        description: bannerData.description || null,
+        image_url: bannerData.image_url,
+        target_url: bannerData.target_url || null,
+        placement: bannerData.placement || 'home_slider',
+        duration_seconds: Number(bannerData.duration_seconds) || 5,
+        start_date: bannerData.start_date ? new Date(bannerData.start_date).toISOString() : new Date().toISOString(),
+        end_date: bannerData.end_date ? new Date(bannerData.end_date).toISOString() : null,
+        is_active: bannerData.is_active !== undefined ? bannerData.is_active : true,
+        priority_order: Number(bannerData.priority_order) || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await this.client
+        .from('banners')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error creating banner:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Update an existing banner record
+   */
+  async updateBanner(bannerId, updates) {
+    try {
+      const payload = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (payload.duration_seconds !== undefined) {
+        payload.duration_seconds = Number(payload.duration_seconds) || 5;
+      }
+      if (payload.priority_order !== undefined) {
+        payload.priority_order = Number(payload.priority_order) || 0;
+      }
+      if (payload.start_date) {
+        payload.start_date = new Date(payload.start_date).toISOString();
+      }
+      if (payload.end_date !== undefined) {
+        payload.end_date = payload.end_date ? new Date(payload.end_date).toISOString() : null;
+      }
+
+      const { data, error } = await this.client
+        .from('banners')
+        .update(payload)
+        .eq('id', bannerId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error updating banner:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Toggle active state
+   */
+  async toggleBannerStatus(bannerId, currentStatus) {
+    return this.updateBanner(bannerId, { is_active: !currentStatus });
+  }
+
+  /**
+   * Delete a banner permanently
+   */
+  async deleteBanner(bannerId) {
+    try {
+      const { error } = await this.client
+        .from('banners')
+        .delete()
+        .eq('id', bannerId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (e) {
+      console.error('Error deleting banner:', e);
+      return { success: false, error: e.message };
+    }
+  }
+}
+
+export const bannersService = new BannersService();

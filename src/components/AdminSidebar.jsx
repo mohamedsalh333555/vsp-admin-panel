@@ -10,6 +10,7 @@ import {
   Swords,
   CreditCard,
   Flame,
+  Megaphone,
   Settings,
   X,
   Shield,
@@ -82,6 +83,11 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
       id: 'tournaments',
       label: t('tournaments'),
       icon: Trophy,
+    },
+    {
+      id: 'banners',
+      label: t('banners'),
+      icon: Megaphone,
     },
     {
       id: 'settings',

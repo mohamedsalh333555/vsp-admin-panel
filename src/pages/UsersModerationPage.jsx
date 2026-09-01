@@ -138,19 +138,35 @@ export const UsersModerationPage = () => {
     }
   };
 
-  const renderRoleBadge = (role) => {
-    switch (role) {
-      case 'cofounder':
-      case 'co_founder':
-        return (
-          <Badge variant="accent" size="sm">
-            {t('cofounder')}
-          </Badge>
-        );
+const COFOUNDER_EMAILS = [
+  'mohamedsalh333555@gmail.com',
+  'admin@vsp.com',
+  'hana.ramadan@vsp.com',
+  'ceo@vsp.com',
+];
+
+  const renderRoleBadge = (user) => {
+    const isCoFounder =
+      user.role === 'cofounder' ||
+      user.role === 'co_founder' ||
+      COFOUNDER_EMAILS.includes((user.email || '').toLowerCase().trim());
+
+    if (isCoFounder) {
+      return (
+        <Badge variant="accent" size="sm">
+          <Crown className="w-3 h-3 text-amber-400 inline fill-amber-400" />
+          <span>{t('cofounder')}</span>
+        </Badge>
+      );
+    }
+
+    switch (user.role) {
       case 'admin':
+      case 'super_admin':
         return (
           <Badge variant="blue" size="sm">
-            {t('admin')}
+            <ShieldCheck className="w-3 h-3 inline" />
+            <span>{t('admin')}</span>
           </Badge>
         );
       case 'owner':
@@ -161,7 +177,7 @@ export const UsersModerationPage = () => {
         );
       case 'pending_admin':
         return (
-          <Badge variant="warning" size="sm">
+          <Badge variant="purple" size="sm">
             {t('pending')}
           </Badge>
         );
