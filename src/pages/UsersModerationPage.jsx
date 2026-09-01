@@ -325,6 +325,10 @@ const COFOUNDER_EMAILS = [
                   const isBlocked = user.is_blocked || false;
                   const isProcessing = processingId === user.id;
                   const isPendingAdmin = user.role === 'pending_admin';
+                  const isCoFounder =
+                    user.role === 'cofounder' ||
+                    user.role === 'co_founder' ||
+                    COFOUNDER_EMAILS.includes((user.email || '').toLowerCase().trim());
 
                   return (
                     <tr key={user.id} className="hover:bg-vsp-card/30 transition-colors">
@@ -344,17 +348,17 @@ const COFOUNDER_EMAILS = [
                           <div>
                             <h4 className="font-bold text-white flex items-center gap-1.5">
                               <span>{user.name || '-'}</span>
-                              {(user.role === 'cofounder' || user.role === 'co_founder') && (
+                              {isCoFounder && (
                                 <Crown className="w-3.5 h-3.5 text-vsp-accent fill-vsp-accent" />
                               )}
                             </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-vsp-textSecondary mt-0.5">
-                              <span>{user.phone || '-'}</span>
+                            <div className="flex items-center gap-1.5 text-[11px] text-vsp-textSecondary mt-0.5">
+                              {user.phone && user.phone !== '-' && <span>{user.phone}</span>}
+                              {user.phone && user.phone !== '-' && user.email && <span>•</span>}
                               {user.email && (
-                                <>
-                                  <span>•</span>
-                                  <span className="truncate max-w-[150px] font-mono text-[10px] text-zinc-500">{user.email}</span>
-                                </>
+                                <span className="truncate max-w-[170px] font-mono text-[10px] text-zinc-400">
+                                  {user.email}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -362,7 +366,7 @@ const COFOUNDER_EMAILS = [
                       </td>
 
                       <td className="px-6 py-4">
-                        {renderRoleBadge(user.role)}
+                        {renderRoleBadge(user)}
                       </td>
 
                       <td className="px-6 py-4 text-vsp-textSecondary font-semibold">
@@ -408,49 +412,58 @@ const COFOUNDER_EMAILS = [
                       </td>
 
                       <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {isPendingAdmin && (
-                            <button
-                              onClick={() => handleApproveAdmin(user.id)}
-                              disabled={isProcessing}
-                              className="px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 font-bold text-xs rounded-xl transition-all inline-flex items-center gap-1 shadow-sm"
-                            >
+                        {isCoFounder ? (
+                          <div className="flex items-center justify-center">
+                            <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-xs rounded-xl inline-flex items-center gap-1.5 shadow-sm">
                               <ShieldCheck className="w-3.5 h-3.5" />
-                              <span>{t('approve_admin_btn')}</span>
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => handleToggleBlock(user.id, isBlocked)}
-                            disabled={isProcessing}
-                            className={`px-3 py-1.5 font-bold text-xs rounded-xl border transition-all inline-flex items-center gap-1.5 shadow-sm ${
-                              isBlocked
-                                ? 'bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border-emerald-500/30'
-                                : 'bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-400 border-zinc-700 hover:border-red-500/30'
-                            }`}
-                          >
-                            {isBlocked ? (
-                              <>
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                <span>{t('unblock_user')}</span>
-                              </>
-                            ) : (
-                              <>
-                                <Ban className="w-3.5 h-3.5" />
-                                <span>{t('block_user')}</span>
-                              </>
+                              <span>{t('protected_cofounder_account')}</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2">
+                            {isPendingAdmin && (
+                              <button
+                                onClick={() => handleApproveAdmin(user.id)}
+                                disabled={isProcessing}
+                                className="px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 font-bold text-xs rounded-xl transition-all inline-flex items-center gap-1 shadow-sm"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                <span>{t('approve_admin_btn')}</span>
+                              </button>
                             )}
-                          </button>
 
-                          <button
-                            onClick={() => setUserToDelete(user)}
-                            disabled={isProcessing}
-                            title={t('delete_permanent')}
-                            className="p-1.5 bg-vsp-card hover:bg-red-500/20 text-zinc-400 hover:text-red-400 border border-vsp-border hover:border-red-500/30 rounded-xl transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                            <button
+                              onClick={() => handleToggleBlock(user.id, isBlocked)}
+                              disabled={isProcessing}
+                              className={`px-3 py-1.5 font-bold text-xs rounded-xl border transition-all inline-flex items-center gap-1.5 shadow-sm ${
+                                isBlocked
+                                  ? 'bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border-emerald-500/30'
+                                  : 'bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-400 border-zinc-700 hover:border-red-500/30'
+                              }`}
+                            >
+                              {isBlocked ? (
+                                <>
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  <span>{t('unblock_user')}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Ban className="w-3.5 h-3.5" />
+                                  <span>{t('block_user')}</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={() => setUserToDelete(user)}
+                              disabled={isProcessing}
+                              title={t('delete_permanent')}
+                              className="p-1.5 bg-vsp-card hover:bg-red-500/20 text-zinc-400 hover:text-red-400 border border-vsp-border hover:border-red-500/30 rounded-xl transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
