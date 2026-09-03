@@ -15,10 +15,19 @@ class AdminService {
         this.client.from('stadiums').select('*', { count: 'exact', head: true }),
         this.client.from('bookings').select('id, total_price, status'),
         this.client.from('vsp_1vs1_players').select('*', { count: 'exact', head: true }),
-        this.client.from('users').select('*', { count: 'exact', head: true }).eq('role', 'owner').or('verification_status.eq.pending,verification_status.is.null'),
+        this.client.from('users').select('id, role, has_stadium, verification_status, additional_data').or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending'),
         this.client.from('bookings').select('*', { count: 'exact', head: true }).or('match_result_status.eq.disputed,status.eq.disputed'),
         this.client.from('payout_settlements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
+
+      const pendingOwnersCount = (pendingOwnersRes.data || []).filter((u) => {
+        const isPending = u.verification_status === 'pending' || !u.verification_status;
+        const hasOwnerIntent =
+          u.role === 'owner' ||
+          u.has_stadium === true ||
+          Boolean(u.additional_data?.verificationDocuments);
+        return isPending && hasOwnerIntent && u.verification_status !== 'approved';
+      }).length;
 
       let totalRevenue = 0;
       let activeBookingsCount = 0;
@@ -36,7 +45,7 @@ class AdminService {
         totalBookings: activeBookingsCount || bookingsRes.data?.length || 0,
         totalRevenue,
         total1v1Players: league1v1Res.count || 0,
-        pendingOwners: pendingOwnersRes.count || 0,
+        pendingOwners: pendingOwnersCount,
         disputesCount: disputesRes.count || 0,
         pendingPayouts: payoutsRes.count || 0,
       };
@@ -142,12 +151,20 @@ class AdminService {
       const { data, error } = await this.client
         .from('users')
         .select('*')
-        .eq('role', 'owner')
-        .or('verification_status.eq.pending,verification_status.is.null')
+        .or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+
+      return (data || []).filter((u) => {
+        const isPending = u.verification_status === 'pending' || !u.verification_status;
+        const hasOwnerIntent =
+          u.role === 'owner' ||
+          u.has_stadium === true ||
+          Boolean(u.additional_data?.verificationDocuments) ||
+          Boolean(u.additional_data?.taxCardUrl);
+        return isPending && hasOwnerIntent && u.verification_status !== 'approved';
+      });
     } catch (e) {
       console.error('Error in fetchPendingOwners:', e);
       return [];
@@ -184,8 +201,10 @@ class AdminService {
       const { error: userErr } = await this.client
         .from('users')
         .update({
+          role: 'owner',
           verification_status: 'approved',
           is_identity_verified: true,
+          has_stadium: true,
           is_blocked: false,
           updated_at: new Date().toISOString(),
         })

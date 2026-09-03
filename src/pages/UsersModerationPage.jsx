@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 
 export const UsersModerationPage = () => {
-  const { t } = useLanguage();
+  const { t, lang, isRTL } = useLanguage();
+  const isAr = lang === 'ar' || isRTL;
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -160,6 +161,20 @@ const COFOUNDER_EMAILS = [
       );
     }
 
+    // إذا كان المستخدم قد تقدم كصاحب ملعب وبانتظار التوثيق
+    const isPendingOwner =
+      (user.has_stadium || Boolean(user.additional_data?.verificationDocuments)) &&
+      user.verification_status === 'pending';
+
+    if (isPendingOwner) {
+      return (
+        <Badge variant="warning" size="sm">
+          <Building2 className="w-3 h-3 inline ml-1" />
+          <span>{isAr ? 'صاحب ملعب (قيد التوثيق)' : 'Owner (Pending)'}</span>
+        </Badge>
+      );
+    }
+
     switch (user.role) {
       case 'admin':
       case 'super_admin':
@@ -172,7 +187,8 @@ const COFOUNDER_EMAILS = [
       case 'owner':
         return (
           <Badge variant="warning" size="sm">
-            {t('owner')}
+            <Building2 className="w-3 h-3 inline ml-1" />
+            <span>{t('owner')}</span>
           </Badge>
         );
       case 'pending_admin':
