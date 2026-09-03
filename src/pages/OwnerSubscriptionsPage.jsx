@@ -23,6 +23,7 @@ import {
 
 export const OwnerSubscriptionsPage = () => {
   const { t, lang, isRTL } = useLanguage();
+  const isAr = lang === 'ar' || isRTL;
   const [loading, setLoading] = useState(true);
   const [owners, setOwners] = useState([]);
   const [search, setSearch] = useState('');
