@@ -55,17 +55,24 @@ export const AuthProvider = ({ children }) => {
       if (data) {
         const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
         const isApprovedAdmin = isCoFounder || data.role === 'admin' || data.role === 'super_admin' || data.verification_status === 'approved';
+        const position = data.position || (normalizedEmail.includes('hana') ? 'CEO' : 'COO');
+        const englishName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
         setProfile({
           ...data,
+          name: englishName,
+          position,
           isCoFounder,
           isApprovedAdmin,
         });
       } else {
         // Fallback for co-founder or new account
+        const englishName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
+        const position = normalizedEmail.includes('hana') ? 'CEO' : 'COO';
         setProfile({
           id: userId,
           email: normalizedEmail,
-          name: normalizedEmail === 'hana.ramadan@vsp.com' ? 'هنا رمضان CEO' : 'محمد صلاح COO',
+          name: englishName,
+          position,
           role: isCoFounderEmail ? 'cofounder' : 'admin',
           isCoFounder: isCoFounderEmail,
           isApprovedAdmin: isCoFounderEmail,

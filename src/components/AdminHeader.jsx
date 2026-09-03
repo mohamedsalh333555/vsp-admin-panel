@@ -88,8 +88,8 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
               </div>
             </div>
 
-            <span className="bg-amber-400/10 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md text-[10px] font-bold">
-              {profile.isCoFounder ? t('cofounder') : t('admin')}
+            <span className="bg-amber-400/10 text-amber-400 border border-amber-400/20 px-2.5 py-0.5 rounded-md text-[11px] font-black tracking-wider">
+              {profile?.position || (profile?.isCoFounder ? 'Co-Founder' : 'Admin')}
             </span>
           </div>
         )}

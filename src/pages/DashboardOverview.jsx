@@ -157,15 +157,10 @@ export const DashboardOverview = ({ onNavigate }) => {
   }, [isAr]);
 
   const cofounderName = useMemo(() => {
-    if (profile?.name) {
-      if (isAr && profile.name.toLowerCase().includes('mohamed')) return 'محمد صلاح';
-      if (isAr && profile.name.toLowerCase().includes('hana')) return 'هنا رمضان';
-      return profile.name;
-    }
-    const email = (user?.email || '').toLowerCase();
-    if (email.includes('hana')) return isAr ? 'هنا رمضان' : 'Hana Ramadan';
-    return isAr ? 'محمد صلاح' : 'Mohamed Saleh';
-  }, [profile, user, isAr]);
+    const email = (user?.email || profile?.email || '').toLowerCase();
+    if (email.includes('hana')) return 'Hana Ramadan (CEO)';
+    return 'Mohamed Saleh (COO)';
+  }, [profile, user]);
 
   const kpiCards = [
     {
