@@ -148,22 +148,32 @@ class AdminService {
   // =========================================================================
   async fetchPendingOwners() {
     try {
-      const { data, error } = await this.client
-        .from('users')
-        .select('*')
-        .or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending')
-        .order('created_at', { ascending: false });
+      const [usersRes, unverifiedStadiumsRes] = await Promise.all([
+        this.client
+          .from('users')
+          .select('*')
+          .or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending')
+          .order('created_at', { ascending: false }),
+        this.client
+          .from('stadiums')
+          .select('owner_id')
+          .eq('is_verified', false),
+      ]);
 
-      if (error) throw error;
+      if (usersRes.error) throw usersRes.error;
 
-      return (data || []).filter((u) => {
+      const unverifiedOwnerIds = new Set((unverifiedStadiumsRes.data || []).map((s) => s.owner_id));
+
+      return (usersRes.data || []).filter((u) => {
         const isPending = u.verification_status === 'pending' || !u.verification_status;
+        const hasUnverifiedStadium = unverifiedOwnerIds.has(u.id);
         const hasOwnerIntent =
           u.role === 'owner' ||
           u.has_stadium === true ||
           Boolean(u.additional_data?.verificationDocuments) ||
           Boolean(u.additional_data?.taxCardUrl);
-        return isPending && hasOwnerIntent && u.verification_status !== 'approved';
+
+        return (isPending && hasOwnerIntent) || hasUnverifiedStadium;
       });
     } catch (e) {
       console.error('Error in fetchPendingOwners:', e);
@@ -407,7 +417,13 @@ class AdminService {
       }
 
       if (roleFilter !== 'all') {
-        query = query.eq('role', roleFilter);
+        if (roleFilter === 'owner') {
+          query = query.or('role.eq.owner,has_stadium.eq.true');
+        } else if (roleFilter === 'player') {
+          query = query.eq('role', 'player').or('has_stadium.eq.false,has_stadium.is.null');
+        } else {
+          query = query.eq('role', roleFilter);
+        }
       }
 
       if (statusFilter === 'blocked') {
@@ -448,10 +464,19 @@ class AdminService {
         .eq('id', userId)
         .select();
 
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        return { success: false, error: 'لم يتم تعديل الحساب - يرجى التأكد من تشغيل دالة الحظر في قاعدة البيانات' };
+      // 3. Cascade block/unblock to owned stadiums to protect players from booking at banned venues
+      try {
+        await this.client
+          .from('stadiums')
+          .update({
+            is_blocked: isBlocked,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('owner_id', userId);
+      } catch (stadiumErr) {
+        console.warn('Could not cascade block to stadiums:', stadiumErr);
       }
+
       return { success: true };
     } catch (e) {
       console.error('Error in toggleUserBlockStatus:', e);
@@ -479,6 +504,13 @@ class AdminService {
 
   async deleteUserPermanently(userId) {
     try {
+      // Logic Guard: Never delete co-founder accounts
+      const { data: targetUser } = await this.client.from('users').select('email, role').eq('id', userId).maybeSingle();
+      const COFOUNDER_EMAILS = ['mohamedsalh333555@gmail.com', 'admin@vsp.com', 'hana.ramadan@vsp.com', 'ceo@vsp.com'];
+      if (targetUser && (COFOUNDER_EMAILS.includes((targetUser.email || '').toLowerCase()) || ['co_founder', 'cofounder'].includes(targetUser.role))) {
+        return { success: false, error: 'لا يمكن حذف حساب مؤسس شريك محمي نهائياً' };
+      }
+
       try {
         const { data, error } = await this.client.rpc('delete_user_permanently', {
           p_user_id: userId,

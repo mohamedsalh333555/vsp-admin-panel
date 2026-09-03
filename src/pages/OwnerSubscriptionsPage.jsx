@@ -108,12 +108,14 @@ export const OwnerSubscriptionsPage = () => {
       };
     }
 
-    // Free Trial: 2 calendar months from created_at
-    const trialExpiresAt = new Date(
-      createdAt.getFullYear(),
-      createdAt.getMonth() + 2,
-      createdAt.getDate()
-    );
+    // Free Trial: respects trial_ends_at if stored, or 2 calendar months from created_at
+    const trialExpiresAt = owner.trial_ends_at
+      ? new Date(owner.trial_ends_at)
+      : new Date(
+          createdAt.getFullYear(),
+          createdAt.getMonth() + 2,
+          createdAt.getDate()
+        );
     const diffDays = getCalendarDaysDifference(trialExpiresAt);
     const isExpired = diffDays < 0;
 
