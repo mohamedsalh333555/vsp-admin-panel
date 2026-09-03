@@ -20,6 +20,7 @@ import {
   Phone,
   Mail,
   UserX,
+  Building2,
 } from 'lucide-react';
 
 export const UsersModerationPage = () => {
@@ -34,6 +35,9 @@ export const UsersModerationPage = () => {
 
   // Delete modal state
   const [userToDelete, setUserToDelete] = useState(null);
+
+  // Block / Unblock modal state
+  const [userToToggleBlock, setUserToToggleBlock] = useState(null);
 
   const [toast, setToast] = useState(null);
 
@@ -64,14 +68,25 @@ export const UsersModerationPage = () => {
     return () => clearTimeout(timer);
   }, [search, roleFilter, statusFilter]);
 
-  // Block / Unblock Toggle
-  const handleToggleBlock = async (userId, isBlocked) => {
-    setProcessingId(userId);
+  // Block / Unblock Confirmation Action
+  const handleConfirmToggleBlock = async () => {
+    if (!userToToggleBlock) return;
+    const targetUser = userToToggleBlock;
+    const nextBlocked = !targetUser.is_blocked;
+    setProcessingId(targetUser.id);
+    setUserToToggleBlock(null); // إغلاق النافذة فوراً للعودة للشاشة
     try {
-      const nextBlocked = !isBlocked;
-      const res = await adminService.toggleUserBlockStatus(userId, nextBlocked);
+      const res = await adminService.toggleUserBlockStatus(targetUser.id, nextBlocked);
       if (res.success) {
-        showToast(t('save_booking_success'));
+        showToast(
+          isAr
+            ? nextBlocked
+              ? `تم حظر حساب ${targetUser.name} بنجاح`
+              : `تم إلغاء حظر حساب ${targetUser.name} بنجاح`
+            : nextBlocked
+            ? `User ${targetUser.name} blocked successfully`
+            : `User ${targetUser.name} unblocked successfully`
+        );
         fetchUsers();
       } else {
         showToast(res.error || t('error_loading'), 'error');
@@ -161,16 +176,25 @@ const COFOUNDER_EMAILS = [
       );
     }
 
-    // إذا كان المستخدم قد تقدم كصاحب ملعب وبانتظار التوثيق
-    const isPendingOwner =
-      (user.has_stadium || Boolean(user.additional_data?.verificationDocuments)) &&
-      user.verification_status === 'pending';
+    // إذا كان المستخدم صاحب ملعب أو تقدم كصاحب ملعب
+    const isOwnerUser =
+      user.role === 'owner' ||
+      user.has_stadium === true ||
+      Boolean(user.additional_data?.verificationDocuments);
 
-    if (isPendingOwner) {
+    if (isOwnerUser) {
+      if (user.verification_status === 'pending') {
+        return (
+          <Badge variant="warning" size="sm">
+            <Building2 className="w-3 h-3 inline ml-1" />
+            <span>{isAr ? 'صاحب ملعب (قيد التوثيق)' : 'Owner (Pending)'}</span>
+          </Badge>
+        );
+      }
       return (
         <Badge variant="warning" size="sm">
           <Building2 className="w-3 h-3 inline ml-1" />
-          <span>{isAr ? 'صاحب ملعب (قيد التوثيق)' : 'Owner (Pending)'}</span>
+          <span>{isAr ? 'صاحب ملعب (معتمد)' : 'Owner (Approved)'}</span>
         </Badge>
       );
     }
@@ -182,13 +206,6 @@ const COFOUNDER_EMAILS = [
           <Badge variant="blue" size="sm">
             <ShieldCheck className="w-3 h-3 inline" />
             <span>{t('admin')}</span>
-          </Badge>
-        );
-      case 'owner':
-        return (
-          <Badge variant="warning" size="sm">
-            <Building2 className="w-3 h-3 inline ml-1" />
-            <span>{t('owner')}</span>
           </Badge>
         );
       case 'pending_admin':
@@ -449,7 +466,7 @@ const COFOUNDER_EMAILS = [
                             )}
 
                             <button
-                              onClick={() => handleToggleBlock(user.id, isBlocked)}
+                              onClick={() => setUserToToggleBlock(user)}
                               disabled={isProcessing}
                               className={`px-3 py-1.5 font-bold text-xs rounded-xl border transition-all inline-flex items-center gap-1.5 shadow-sm ${
                                 isBlocked
@@ -489,6 +506,80 @@ const COFOUNDER_EMAILS = [
           </div>
         )}
       </div>
+
+      {/* Block / Unblock Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(userToToggleBlock)}
+        onClose={() => setUserToToggleBlock(null)}
+        title={
+          userToToggleBlock?.is_blocked
+            ? (isAr ? 'تأكيد إلغاء حظر الحساب' : 'Confirm Unblock User')
+            : (isAr ? 'تأكيد حظر حساب المستخدم' : 'Confirm Block User')
+        }
+      >
+        {userToToggleBlock && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-zinc-900 border border-vsp-border flex items-start gap-3">
+              <div
+                className={`p-2 rounded-lg ${
+                  userToToggleBlock.is_blocked
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-red-500/10 text-red-400'
+                }`}
+              >
+                {userToToggleBlock.is_blocked ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : (
+                  <Ban className="w-5 h-5" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-white font-bold">{userToToggleBlock.name}</p>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  {userToToggleBlock.is_blocked
+                    ? (isAr
+                        ? 'هل أنت متأكد من رغبتك في إلغاء حظر هذا الحساب؟ سيتمكن المستخدم من تسجيل الدخول واستعادة حسابه في التطبيق فوراً.'
+                        : 'Are you sure you want to unblock this account? The user will be able to log in and use the app immediately.')
+                    : (isAr
+                        ? 'هل أنت متأكد من رغبتك في حظر هذا الحساب؟ سيتم منعه فوراً من تسجيل الدخول أو إجراء أي حجوزات في التطبيق.'
+                        : 'Are you sure you want to block this account? The user will be restricted from logging in or booking stadiums.')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-vsp-border">
+              <button
+                onClick={() => setUserToToggleBlock(null)}
+                className="px-4 py-2 bg-vsp-card border border-vsp-border text-zinc-300 hover:text-white rounded-xl text-xs font-bold transition-all"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleConfirmToggleBlock}
+                disabled={processingId !== null}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
+                  userToToggleBlock.is_blocked
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold'
+                    : 'bg-red-500 hover:bg-red-600 text-white'
+                }`}
+              >
+                {processingId ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : userToToggleBlock.is_blocked ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <Ban className="w-4 h-4" />
+                )}
+                <span>
+                  {userToToggleBlock.is_blocked
+                    ? (isAr ? 'تأكيد فك الحظر' : 'Confirm Unblock')
+                    : (isAr ? 'تأكيد الحظر' : 'Confirm Block')}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Delete User Confirmation Modal */}
       <Modal

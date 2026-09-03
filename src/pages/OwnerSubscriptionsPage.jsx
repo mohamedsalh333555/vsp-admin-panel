@@ -463,28 +463,44 @@ export const OwnerSubscriptionsPage = () => {
                       </td>
 
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-mono font-bold ${
-                              hasOverCapacity
-                                ? 'text-amber-400'
-                                : details.isUnlimited
-                                ? 'text-emerald-400'
-                                : 'text-zinc-200'
-                            }`}
-                          >
-                            {stadiumCount}
-                          </span>
-                          <span className="text-zinc-500 font-medium">/</span>
-                          <span
-                            className={`text-[11px] ${
-                              details.isUnlimited
-                                ? 'text-emerald-400 font-bold'
-                                : 'text-zinc-400'
-                            }`}
-                          >
-                            {details.capacityLimit}
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-mono font-bold ${
+                                hasOverCapacity
+                                  ? 'text-amber-400'
+                                  : details.isUnlimited
+                                  ? 'text-emerald-400'
+                                  : stadiumCount === 0
+                                  ? 'text-zinc-500'
+                                  : 'text-zinc-200'
+                              }`}
+                            >
+                              {stadiumCount}
+                            </span>
+                            <span className="text-zinc-500 font-medium">/</span>
+                            <span
+                              className={`text-[11px] ${
+                                details.isUnlimited
+                                  ? 'text-emerald-400 font-bold'
+                                  : 'text-zinc-400'
+                              }`}
+                            >
+                              {details.capacityLimit}
+                            </span>
+                          </div>
+                          {stadiumCount === 0 ? (
+                            <span className="text-[10px] text-amber-400/90 flex items-center gap-1 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                              {isAr ? 'لم يُدرج الملعب بعد' : 'No stadium listed yet'}
+                            </span>
+                          ) : (
+                            owner.stadiumNames && owner.stadiumNames.length > 0 && (
+                              <span className="text-[10px] text-emerald-400/80 truncate max-w-[140px]">
+                                {owner.stadiumNames.join(', ')}
+                              </span>
+                            )
+                          )}
                         </div>
                       </td>
 

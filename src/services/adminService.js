@@ -255,7 +255,7 @@ class AdminService {
       let query = this.client
         .from('users')
         .select('*')
-        .eq('role', 'owner')
+        .or('role.eq.owner,has_stadium.eq.true')
         .order('created_at', { ascending: false });
 
       if (searchQuery && searchQuery.trim()) {
@@ -427,15 +427,31 @@ class AdminService {
 
   async toggleUserBlockStatus(userId, isBlocked) {
     try {
-      const { error } = await this.client
+      // 1. Try atomic admin procedure
+      try {
+        const { data: rpcData, error: rpcError } = await this.client.rpc('admin_toggle_user_block', {
+          p_user_id: userId,
+          p_is_blocked: isBlocked,
+        });
+        if (!rpcError && rpcData?.success) {
+          return { success: true };
+        }
+      } catch (_) {}
+
+      // 2. Direct update fallback
+      const { data, error } = await this.client
         .from('users')
         .update({
           is_blocked: isBlocked,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        return { success: false, error: 'لم يتم تعديل الحساب - يرجى التأكد من تشغيل دالة الحظر في قاعدة البيانات' };
+      }
       return { success: true };
     } catch (e) {
       console.error('Error in toggleUserBlockStatus:', e);
