@@ -8,17 +8,12 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
   const { profile, logout, updateAvatar } = useAuth();
   const fileInputRef = useRef(null);
 
-  const handleAvatarChange = (e) => {
+  const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Convert to base64 for reliable instant persistence and preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result;
-      updateAvatar(base64String);
-    };
-    reader.readAsDataURL(file);
+    // رفع مباشر للملف إلى سوبابيز Storage
+    await updateAvatar(file);
   };
 
   const avatarUrl = profile?.avatar_url || profile?.profile_image_url;

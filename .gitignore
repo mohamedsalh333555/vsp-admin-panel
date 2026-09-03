@@ -13,6 +13,7 @@ dist-ssr
 *.local
 build/
 .dart_tool/
+*.txt
 
 # Editor directories and files
 .vscode/*

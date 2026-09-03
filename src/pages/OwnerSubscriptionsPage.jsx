@@ -144,7 +144,7 @@ export const OwnerSubscriptionsPage = () => {
     if (!selectedOwner) return;
     const daysNumber = parseInt(proDays, 10);
     if (!daysNumber || daysNumber <= 0) {
-      showToast(t('duration_days'), 'error');
+      showToast(t('toast_fill_required'), 'error');
       return;
     }
 

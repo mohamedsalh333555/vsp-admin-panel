@@ -757,34 +757,19 @@ class AdminService {
       if (data && data.vsp_1v1_is_open !== undefined) {
         return Boolean(data.vsp_1v1_is_open);
       }
-    } catch (_) {}
-
-    try {
-      const { data } = await this.client
-        .from('system_config')
-        .select('value')
-        .eq('key', 'vsp_1v1_is_open')
-        .maybeSingle();
-
-      if (data) return data.value === 'true';
-    } catch (_) {}
-
-    return true; // default open
+      return true;
+    } catch (_) {
+      return true;
+    }
   }
 
   async set1v1RegistrationOpenStatus(isOpen) {
     try {
-      try {
-        await this.client.from('app_config').upsert({ id: 1, vsp_1v1_is_open: isOpen });
-      } catch (_) {}
+      const { error } = await this.client
+        .from('app_config')
+        .upsert({ id: 1, vsp_1v1_is_open: isOpen, updated_at: new Date().toISOString() });
 
-      try {
-        await this.client.from('system_config').upsert({
-          key: 'vsp_1v1_is_open',
-          value: isOpen.toString(),
-        });
-      } catch (_) {}
-
+      if (error) throw error;
       return { success: true };
     } catch (e) {
       console.error('Error setting 1v1 gate status:', e);
@@ -1208,6 +1193,7 @@ class AdminService {
         .upsert({
           id: 1,
           is_maintenance: enabled,
+          updated_at: new Date().toISOString(),
         });
 
       if (error) throw error;

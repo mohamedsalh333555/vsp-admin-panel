@@ -52,27 +52,27 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .maybeSingle();
 
+      const defaultName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
+      const defaultPosition = normalizedEmail.includes('hana') ? 'CEO' : 'COO';
+
       if (data) {
         const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
         const isApprovedAdmin = isCoFounder || data.role === 'admin' || data.role === 'super_admin' || data.verification_status === 'approved';
-        const position = data.position || (normalizedEmail.includes('hana') ? 'CEO' : 'COO');
-        const englishName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
+        
         setProfile({
           ...data,
-          name: englishName,
-          position,
+          // الحفاظ على الاسم الحقيقي من قاعدة البيانات إن وجد، واستخدام الافتراضي فقط إذا كان الحقل فارغاً
+          name: data.name?.trim() ? data.name : defaultName,
+          position: data.position || (isCoFounder ? defaultPosition : 'Admin'),
           isCoFounder,
           isApprovedAdmin,
         });
       } else {
-        // Fallback for co-founder or new account
-        const englishName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
-        const position = normalizedEmail.includes('hana') ? 'CEO' : 'COO';
         setProfile({
           id: userId,
           email: normalizedEmail,
-          name: englishName,
-          position,
+          name: defaultName,
+          position: isCoFounderEmail ? defaultPosition : 'Admin',
           role: isCoFounderEmail ? 'cofounder' : 'admin',
           isCoFounder: isCoFounderEmail,
           isApprovedAdmin: isCoFounderEmail,
@@ -172,21 +172,44 @@ export const AuthProvider = ({ children }) => {
     return authUser;
   };
 
-  const updateAvatar = async (avatarUrl) => {
-    if (!user) return;
+  // رفع ملف الأفاتار إلى الـ Bucket profile-pictures وحفظ الرابط العام
+  const updateAvatar = async (file) => {
+    if (!user || !file) return { success: false };
     try {
       const dbClient = supabaseAdmin || supabase;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await dbClient.storage
+        .from('profile-pictures')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = dbClient.storage
+        .from('profile-pictures')
+        .getPublicUrl(filePath);
+
+      const publicUrl = publicUrlData.publicUrl;
+
       await dbClient.from('users').update({
-        profile_image_url: avatarUrl,
+        profile_image_url: publicUrl,
         updated_at: new Date().toISOString(),
       }).eq('id', user.id);
 
       setProfile((prev) => ({
         ...prev,
-        profile_image_url: avatarUrl,
+        profile_image_url: publicUrl,
       }));
+
+      return { success: true, url: publicUrl };
     } catch (err) {
       console.error('Error updating avatar:', err);
+      return { success: false, error: err.message };
     }
   };
 
@@ -204,4 +227,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-
