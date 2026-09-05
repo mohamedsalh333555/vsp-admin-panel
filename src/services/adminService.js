@@ -952,6 +952,161 @@ class AdminService {
     }
   }
 
+
+  // =========================================================================
+  // MODULE F.2: VSP 1v1 TOURNAMENT SYSTEM (NEW TABLES & ATOMIC RPC)
+  // =========================================================================
+
+  async create1v1Tournament({ name, target_player_count, created_by = null }) {
+    try {
+      const { data, error } = await this.client
+        .from('vsp_1v1_tournaments')
+        .insert({
+          name: name?.trim() || 'بطولة 1vs1 جديدة',
+          target_player_count: parseInt(target_player_count) || 8,
+          status: 'draft',
+          created_by: created_by || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error creating 1v1 tournament:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async save1v1TournamentPlayers(tournamentId, playersList) {
+    try {
+      if (!tournamentId) throw new Error('Missing tournament ID');
+
+      // Delete existing player records for this tournament to re-insert cleanly
+      const { error: delErr } = await this.client
+        .from('vsp_1v1_tournament_players')
+        .delete()
+        .eq('tournament_id', tournamentId);
+      if (delErr) throw delErr;
+
+      const formatted = playersList.map((p, idx) => ({
+        tournament_id: tournamentId,
+        player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
+        user_id: p.user_id || null,
+        avatar_url: p.avatar_url || null,
+        tackles: Math.max(0, parseInt(p.tackles) || 0),
+        goals: Math.max(0, parseInt(p.goals) || 0),
+        skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+        // NOTE: total_points is GENERATED ALWAYS AS by PostgreSQL, DO NOT SEND!
+      }));
+
+      if (formatted.length > 0) {
+        const { error: insErr } = await this.client
+          .from('vsp_1v1_tournament_players')
+          .insert(formatted);
+        if (insErr) throw insErr;
+      }
+
+      return { success: true };
+    } catch (e) {
+      console.error('Error saving 1v1 tournament players:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async publish1v1Tournament(tournamentId) {
+    try {
+      if (!tournamentId) throw new Error('Missing tournament ID');
+
+      const { data, error } = await this.client.rpc('publish_1v1_tournament_atomic', {
+        p_tournament_id: tournamentId,
+      });
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || 'فشل نشر البطولة');
+      }
+
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error publishing 1v1 tournament:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async getActiveOrLatest1v1Tournament() {
+    try {
+      // 1. Find currently published tournament, or latest draft
+      const { data: activeList, error: tErr } = await this.client
+        .from('vsp_1v1_tournaments')
+        .select('*')
+        .in('status', ['published', 'draft'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (tErr) throw tErr;
+
+      let tournament = activeList && activeList.length > 0 ? activeList[0] : null;
+
+      if (!tournament) {
+        // Fallback to latest archived if neither published nor draft exists
+        const { data: archivedList, error: aErr } = await this.client
+          .from('vsp_1v1_tournaments')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (aErr) throw aErr;
+        tournament = archivedList && archivedList.length > 0 ? archivedList[0] : null;
+      }
+
+      if (!tournament) {
+        return { success: true, tournament: null, players: [] };
+      }
+
+      // 2. Fetch players for this tournament sorted by total_points DESC
+      const { data: players, error: pErr } = await this.client
+        .from('vsp_1v1_tournament_players')
+        .select('*')
+        .eq('tournament_id', tournament.id)
+        .order('total_points', { ascending: false });
+
+      if (pErr) throw pErr;
+
+      const mappedPlayers = (players || []).map((p, idx) => ({
+        id: p.id,
+        player_name: p.player_name,
+        name: p.player_name,
+        user_id: p.user_id,
+        avatar_url: p.avatar_url || '',
+        tackles: p.tackles || 0,
+        goals: p.goals || 0,
+        skills: p.skills || 0,
+        skill_points: p.skills || 0,
+        total_points: (p.tackles || 0) + (p.goals || 0) + (p.skills || 0),
+        rank: idx + 1,
+      }));
+
+      return { success: true, tournament, players: mappedPlayers };
+    } catch (e) {
+      console.error('Error in getActiveOrLatest1v1Tournament:', e);
+      return { success: false, tournament: null, players: [], error: e.message };
+    }
+  }
+
+  async list1v1Tournaments() {
+    try {
+      const { data, error } = await this.client
+        .from('vsp_1v1_tournaments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { success: true, tournaments: data || [] };
+    } catch (e) {
+      console.error('Error listing 1v1 tournaments:', e);
+      return { success: false, tournaments: [], error: e.message };
+    }
+  }
+
   // =========================================================================
   // MODULE G: ENTERPRISE FINANCIAL CLEARING & PAYOUT LEDGER
   // =========================================================================
