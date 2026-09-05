@@ -157,9 +157,9 @@ export const DashboardOverview = ({ onNavigate }) => {
   }, [isAr]);
 
   const cofounderName = useMemo(() => {
-    const email = (user?.email || profile?.email || '').toLowerCase();
-    if (email.includes('hana')) return 'Hana Ramadan (CEO)';
-    return 'Mohamed Saleh (COO)';
+    const name = profile?.name || user?.user_metadata?.name || 'Admin';
+    const pos = profile?.position || user?.user_metadata?.position;
+    return pos ? `${name} (${pos})` : name;
   }, [profile, user]);
 
   const kpiCards = [

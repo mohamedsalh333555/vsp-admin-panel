@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, supabaseAdmin } from '../lib/supabase';
 
 const AuthContext = createContext();
@@ -6,6 +6,7 @@ const AuthContext = createContext();
 const COFOUNDER_EMAILS = [
   'mohamedsalh333555@gmail.com',
   'admin@vsp.com',
+  'coo@vsp.com',
   'hana.ramadan@vsp.com',
   'ceo@vsp.com',
 ];
@@ -53,17 +54,23 @@ export const AuthProvider = ({ children }) => {
         .maybeSingle();
 
       const defaultName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
-      const defaultPosition = normalizedEmail.includes('hana') ? 'CEO' : 'COO';
+      const defaultPosition = 'CEO & COO';
 
       if (data) {
         const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
-        const isApprovedAdmin = isCoFounder || data.role === 'admin' || data.role === 'super_admin' || data.verification_status === 'approved';
-        
+        const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(data.role?.toLowerCase());
+        // أمان تام: التحقق من أن الدور إداري فعلياً وأن الحساب غير محظور
+        const isApprovedAdmin = !data.is_blocked && (isCoFounder || (isAdminRole && data.verification_status === 'approved'));
+
+        // قراءة المنصب مباشرة من عمود position في الداتابيز أولاً وبشكل ديناميكي 100%
+        const livePosition = data.position?.trim() 
+          ? data.position 
+          : (data.additional_data?.title || (isCoFounder ? defaultPosition : 'Admin'));
+
         setProfile({
           ...data,
-          // الحفاظ على الاسم الحقيقي من قاعدة البيانات إن وجد، واستخدام الافتراضي فقط إذا كان الحقل فارغاً
-          name: data.name?.trim() ? data.name : defaultName,
-          position: data.position || (isCoFounder ? defaultPosition : 'Admin'),
+          name: data.name?.trim() ? data.name : (isCoFounderEmail ? defaultName : (data.email || 'Admin')),
+          position: livePosition,
           isCoFounder,
           isApprovedAdmin,
         });
@@ -73,7 +80,7 @@ export const AuthProvider = ({ children }) => {
           email: normalizedEmail,
           name: defaultName,
           position: isCoFounderEmail ? defaultPosition : 'Admin',
-          role: isCoFounderEmail ? 'cofounder' : 'admin',
+          role: isCoFounderEmail ? 'co_founder' : 'guest',
           isCoFounder: isCoFounderEmail,
           isApprovedAdmin: isCoFounderEmail,
         });
@@ -100,76 +107,6 @@ export const AuthProvider = ({ children }) => {
       throw error;
     }
     return data;
-  };
-
-  const register = async (name, phone, email, password) => {
-    setLoading(true);
-    const normalizedEmail = (email || '').toLowerCase().trim();
-    const isCoFounder = COFOUNDER_EMAILS.includes(normalizedEmail);
-
-    let authUser = null;
-
-    // 1. Try creating confirmed user directly with admin service (instant activation)
-    try {
-      if (supabaseAdmin?.auth?.admin) {
-        const { data: adminCreated, error: adminErr } = await supabaseAdmin.auth.admin.createUser({
-          email: normalizedEmail,
-          password,
-          email_confirm: true,
-          user_metadata: { name, phone },
-        });
-
-        if (!adminErr && adminCreated?.user) {
-          authUser = adminCreated.user;
-        }
-      }
-    } catch (e) {
-      console.warn('Admin createUser fallback to signUp:', e);
-    }
-
-    // 2. Fallback to standard signUp
-    if (!authUser) {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-        options: {
-          data: { name, phone },
-        },
-      });
-
-      if (authError) {
-        setLoading(false);
-        if (authError.message.includes('already registered')) {
-          throw new Error('هذا البريد الإلكتروني مسجل بالفعل، يمكنك تسجيل الدخول مباشرة');
-        }
-        throw authError;
-      }
-      authUser = authData?.user;
-    }
-
-    // 3. Upsert user record in database using actual schema
-    if (authUser) {
-      const dbClient = supabaseAdmin || supabase;
-      await dbClient.from('users').upsert({
-        id: authUser.id,
-        name: name.trim(),
-        phone: phone.trim(),
-        email: normalizedEmail,
-        role: isCoFounder ? 'cofounder' : 'admin',
-        verification_status: isCoFounder ? 'approved' : 'pending',
-        is_identity_verified: isCoFounder,
-        is_blocked: false,
-        updated_at: new Date().toISOString(),
-      });
-
-      // Auto sign-in
-      try {
-        await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-      } catch (_) {}
-    }
-
-    setLoading(false);
-    return authUser;
   };
 
   // رفع ملف الأفاتار إلى الـ Bucket profile-pictures وحفظ الرابط العام
@@ -220,7 +157,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, register, logout, updateAvatar, fetchUserProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, logout, updateAvatar, fetchUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

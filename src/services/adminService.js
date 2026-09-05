@@ -876,6 +876,59 @@ class AdminService {
     }
   }
 
+  async publish1v1Standings(playersList) {
+    try {
+      // 1. Clear current standings
+      await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
+
+      // 2. Sort players by total points desc
+      const sorted = [...playersList].sort((a, b) => {
+        const ptA = (Number(a.tackles) || 0) + (Number(a.goals) || 0) + (Number(a.skill_points) || 0);
+        const ptB = (Number(b.tackles) || 0) + (Number(b.goals) || 0) + (Number(b.skill_points) || 0);
+        return ptB - ptA;
+      });
+
+      // 3. Format rows
+      const formatted = sorted.map((p, idx) => {
+        const tackles = Math.max(0, parseInt(p.tackles) || 0);
+        const goals = Math.max(0, parseInt(p.goals) || 0);
+        const skills = Math.max(0, parseInt(p.skill_points) || 0);
+        const total = tackles + goals + skills;
+        return {
+          name: p.name?.trim() || `لاعب #${idx + 1}`,
+          avatar_url: p.avatar_url || '',
+          tackles: tackles,
+          goals: goals,
+          skill_points: skills,
+          total_points: total,
+          titles: Number(p.titles) || (idx === 0 ? 1 : 0),
+          trend: idx === 0 ? 'up' : 'stable',
+        };
+      });
+
+      if (formatted.length > 0) {
+        const { error } = await this.client.from('vsp_1vs1_players').insert(formatted);
+        if (error) throw error;
+      }
+
+      return { success: true };
+    } catch (e) {
+      console.error('Error in publish1v1Standings:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async wipe1v1TournamentData() {
+    try {
+      await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
+      await this.client.from('vsp_1v1_registrations').delete().not('id', 'is', null);
+      return { success: true };
+    } catch (e) {
+      console.error('Error in wipe1v1TournamentData:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
   async update1v1PlayerStats(playerId, stats) {
     try {
       const { error } = await this.client
