@@ -666,6 +666,35 @@ class AdminService {
     }
   }
 
+  async approveChampionship(championshipId) {
+    try {
+      const { data, error } = await this.client.rpc('admin_approve_championship_atomic', {
+        p_championship_id: championshipId,
+      });
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in approveChampionship:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
+  async rejectChampionship(championshipId, reason = '') {
+    try {
+      const { data, error } = await this.client.rpc('admin_reject_championship_atomic', {
+        p_championship_id: championshipId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in rejectChampionship:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
   // =========================================================================
   // MODULE E: DISPUTES RESOLUTION & REPORTS
   // =========================================================================

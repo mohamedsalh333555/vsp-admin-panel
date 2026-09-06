@@ -19,19 +19,30 @@ import {
   Flame,
   Award,
   AlertTriangle,
+  Check,
+  X,
+  ShieldCheck,
+  MapPin,
 } from 'lucide-react';
 
 export const TournamentControlPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [championships, setChampionships] = useState([]);
+  const [activeTab, setActiveTab] = useState('approved'); // 'approved' | 'pending'
   const [updatingId, setUpdatingId] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
   const [selectedForBracket, setSelectedForBracket] = useState(null);
   const [confirmingBracket, setConfirmingBracket] = useState(false);
   const [selectedForPrizeDelivery, setSelectedForPrizeDelivery] = useState(null);
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [confirmDeliveryCheck, setConfirmDeliveryCheck] = useState(false);
   const [deliveringPrize, setDeliveringPrize] = useState(false);
+
+  // Rejection modal state
+  const [selectedForReject, setSelectedForReject] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   const [toast, setToast] = useState(null);
 
@@ -54,6 +65,46 @@ export const TournamentControlPage = () => {
   useEffect(() => {
     fetchTournaments();
   }, []);
+
+  const approvedTournaments = championships.filter((c) => c.is_approved !== false);
+  const pendingTournaments = championships.filter((c) => c.is_approved === false);
+
+  const handleApproveChampionship = async (id) => {
+    setActionLoadingId(id);
+    try {
+      const res = await adminService.approveChampionship(id);
+      if (res.success) {
+        showToast('تمت الموافقة على البطولة واعتمادها بنجاح.');
+        fetchTournaments();
+      } else {
+        showToast(res.error || 'فشلت عملية الموافقة على البطولة', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'حدث خطأ أثناء اعتماد البطولة', 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleExecuteReject = async () => {
+    if (!selectedForReject) return;
+    setRejecting(true);
+    try {
+      const res = await adminService.rejectChampionship(selectedForReject.id, rejectReason);
+      if (res.success) {
+        showToast('تم رفض البطولة وحذفها وإشعار المالك بنجاح.');
+        setSelectedForReject(null);
+        setRejectReason('');
+        fetchTournaments();
+      } else {
+        showToast(res.error || 'فشلت عملية رفض البطولة', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'حدث خطأ أثناء رفض البطولة', 'error');
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const updateStatus = async (id, nextStatus) => {
     setUpdatingId(id);
@@ -284,6 +335,89 @@ export const TournamentControlPage = () => {
         </Modal>
       )}
 
+      {/* Rejection Modal */}
+      {selectedForReject && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            if (!rejecting) {
+              setSelectedForReject(null);
+              setRejectReason('');
+            }
+          }}
+          title="تأكيد رفض وحذف البطولة"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-rose-200/90 leading-relaxed">
+                <p className="font-bold text-rose-300 mb-1">
+                  تحذير: سيتم حذف البطولة وإشعار المالك
+                </p>
+                سيتم حذف هذه البطولة نهائياً من النظام وإرسال إشعار فوري لمالك الملعب يوضح سبب الرفض.
+              </div>
+            </div>
+
+            <div className="bg-vsp-surfaceAlt p-3 rounded-xl border border-vsp-border space-y-1.5 text-xs">
+              <div className="flex justify-between text-vsp-textSecondary">
+                <span>اسم البطولة:</span>
+                <span className="font-bold text-white">{selectedForReject.name}</span>
+              </div>
+              <div className="flex justify-between text-vsp-textSecondary">
+                <span>المحافظة:</span>
+                <span className="font-bold text-white">{selectedForReject.governorate || '-'}</span>
+              </div>
+              <div className="flex justify-between text-vsp-textSecondary">
+                <span>رسوم الاشتراك:</span>
+                <span className="font-bold text-white">
+                  {selectedForReject.entry_fee ? `${Number(selectedForReject.entry_fee).toLocaleString()} ج.م` : 'مجانية'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-300">
+                سبب الرفض (سيتم إرساله للمالك في الإشعار)
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="مثال: بيانات الملعب غير مكتملة، مواعيد البطولة تتعارض مع بطولات أخرى، أو الرسوم غير مناسبة..."
+                className="w-full h-24 p-2.5 bg-vsp-surfaceAlt border border-vsp-border rounded-xl text-xs text-white placeholder-zinc-500 focus:border-rose-500 outline-none resize-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={rejecting}
+                onClick={() => {
+                  setSelectedForReject(null);
+                  setRejectReason('');
+                }}
+                className="flex-1 py-2.5 bg-vsp-surfaceAlt hover:bg-vsp-card text-vsp-textSecondary hover:text-white rounded-xl text-xs font-bold transition-all border border-vsp-border"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={rejecting}
+                onClick={handleExecuteReject}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-600/20"
+              >
+                {rejecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <X className="w-4 h-4" />
+                )}
+                <span>تأكيد الرفض والحذف</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -304,12 +438,151 @@ export const TournamentControlPage = () => {
         </button>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-vsp-border pb-3">
+        <button
+          onClick={() => setActiveTab('approved')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'approved'
+              ? 'bg-vsp-accent text-black shadow-lg shadow-vsp-accent/20'
+              : 'bg-vsp-surface hover:bg-vsp-card text-zinc-400 hover:text-white border border-vsp-border'
+          }`}
+        >
+          <CheckCircle className="w-4 h-4" />
+          <span>البطولات المعتمدة</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              activeTab === 'approved' ? 'bg-black/20 text-black' : 'bg-zinc-800 text-zinc-400'
+            }`}
+          >
+            {approvedTournaments.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative ${
+            activeTab === 'pending'
+              ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+              : 'bg-vsp-surface hover:bg-vsp-card text-zinc-400 hover:text-white border border-vsp-border'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>بطولات بانتظار الموافقة</span>
+          {pendingTournaments.length > 0 && (
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'pending'
+                  ? 'bg-black/20 text-black'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
+              }`}
+            >
+              {pendingTournaments.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Content */}
       {loading ? (
         <div className="h-64 flex items-center justify-center">
           <Loader2 className="w-8 h-8 text-vsp-accent animate-spin" />
         </div>
-      ) : championships.length === 0 ? (
+      ) : activeTab === 'pending' ? (
+        pendingTournaments.length === 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="لا توجد بطولات بانتظار الموافقة"
+            subtitle="كافة بطولات ملاك الملاعب تم اعتمادها ومراجعتها بنجاح."
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingTournaments.map((champ) => {
+              const isActioning = actionLoadingId === champ.id;
+
+              return (
+                <div
+                  key={champ.id}
+                  className="bg-vsp-surface border border-amber-500/30 hover:border-amber-500/50 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between shadow-lg shadow-amber-500/5"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-white text-sm line-clamp-1">{champ.name}</h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                        بانتظار المراجعة
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-vsp-textSecondary line-clamp-2 leading-relaxed">
+                      {champ.rules || `${champ.sport_type || 'Football'}`}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-vsp-border/50 text-xs">
+                      <div className="flex items-center gap-1.5 text-vsp-textSecondary">
+                        <Users className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{champ.max_teams || 16} {t('teams_count_col')}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-vsp-textSecondary">
+                        <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{champ.governorate || 'القاهرة'}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-vsp-textSecondary">
+                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>
+                          {champ.prize_pool && Number(champ.prize_pool) > 0
+                            ? `${Number(champ.prize_pool).toLocaleString()} ${t('currency')}`
+                            : champ.grand_prize && Number(champ.grand_prize) > 0
+                            ? `${Number(champ.grand_prize).toLocaleString()} ${t('currency')}`
+                            : (champ.trophy_medals ? 'كأس وميداليات' : 'شرفية')}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-vsp-textSecondary">
+                        <span className="text-[10px] text-zinc-500">الاشتراك:</span>
+                        <span className="text-[11px] font-bold text-white">
+                          {champ.entry_fee ? `${Number(champ.entry_fee).toLocaleString()} ج.م` : 'مجانية'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions for Pending Tournaments: Approve & Reject */}
+                  <div className="pt-3 border-t border-vsp-border flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isActioning}
+                      onClick={() => handleApproveChampionship(champ.id)}
+                      className="flex-1 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 hover:border-emerald-500 text-emerald-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {isActioning ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      <span>موافقة ونشر</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isActioning}
+                      onClick={() => {
+                        setSelectedForReject(champ);
+                        setRejectReason('');
+                      }}
+                      className="flex-1 py-2 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 hover:border-rose-500 text-rose-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>رفض البطولة</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : approvedTournaments.length === 0 ? (
         <EmptyState
           icon={Trophy}
           title={t('no_tournaments_title')}
@@ -317,7 +590,7 @@ export const TournamentControlPage = () => {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {championships.map((champ) => {
+          {approvedTournaments.map((champ) => {
             const isProcessing = updatingId === champ.id;
             const status = champ.status || 'draft';
             const isOngoing = status === 'ongoing' || status === 'in_progress' || status === 'active';
