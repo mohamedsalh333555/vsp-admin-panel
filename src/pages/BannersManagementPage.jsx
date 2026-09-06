@@ -31,10 +31,16 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 
+const getInitialStartDate = () => {
+  const nowWithBuffer = new Date(Date.now() - 5 * 60 * 1000);
+  return nowWithBuffer.toISOString().slice(0, 16);
+};
+
 export const BannersManagementPage = () => {
   const { t, isRTL } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState([]);
+  const [loadError, setLoadError] = useState(null);
   const [stats, setStats] = useState({
     totalBanners: 0,
     activeBanners: 0,
@@ -65,13 +71,14 @@ export const BannersManagementPage = () => {
     target_url: '',
     placement: 'home_slider',
     duration_seconds: 5,
-    start_date: new Date().toISOString().slice(0, 16),
+    start_date: getInitialStartDate(),
     end_date: '',
     is_active: true,
     priority_order: 0,
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -79,6 +86,7 @@ export const BannersManagementPage = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [bannersRes, statsRes] = await Promise.all([
         bannersService.fetchBanners({ placement: filterPlacement, status: filterStatus }),
@@ -88,6 +96,7 @@ export const BannersManagementPage = () => {
       if (bannersRes.success) {
         setBanners(bannersRes.data || []);
       } else {
+        setLoadError(bannersRes.error || 'تعذر تحميل بيانات البانرات، يرجى المحاولة مرة أخرى');
         showToast(bannersRes.error || t('error_loading'), 'error');
       }
 
@@ -95,6 +104,7 @@ export const BannersManagementPage = () => {
         setStats(statsRes.stats);
       }
     } catch (e) {
+      setLoadError(e.message || 'تعذر تحميل بيانات البانرات، يرجى المحاولة مرة أخرى');
       showToast(e.message || t('error_loading'), 'error');
     } finally {
       setLoading(false);
@@ -114,7 +124,7 @@ export const BannersManagementPage = () => {
       target_url: '',
       placement: 'home_slider',
       duration_seconds: 5,
-      start_date: new Date().toISOString().slice(0, 16),
+      start_date: getInitialStartDate(),
       end_date: '',
       is_active: true,
       priority_order: 0,
@@ -143,17 +153,33 @@ export const BannersManagementPage = () => {
     setIsModalOpen(true);
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
+  const validateAndSetFile = (file) => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      showToast('Maximum image size is 5MB', 'error');
+      showToast('حجم الصورة يتجاوز الحد الأقصى (5 ميجابايت)', 'error');
+      return;
+    }
+
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    const allowedExts = ['png', 'jpg', 'jpeg', 'webp'];
+    if (!allowedExts.includes(fileExt)) {
+      showToast('صيغة الملف غير مدعومة. يرجى اختيار صورة بصيغة JPG أو PNG أو WebP فقط.', 'error');
       return;
     }
 
     setSelectedFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
+    if (e.target) {
+      e.target.value = null;
+    }
   };
 
   const handleSaveBanner = async (e) => {
@@ -384,8 +410,12 @@ export const BannersManagementPage = () => {
             >
               <option value="all">{t('placement_all')}</option>
               <option value="home_slider">{t('placement_home_slider')}</option>
-              <option value="popup">{t('placement_popup')}</option>
-              <option value="tournaments_screen">{t('placement_tournaments')}</option>
+              {banners.some((b) => b.placement === 'popup') && (
+                <option value="popup">{t('placement_popup')}</option>
+              )}
+              {banners.some((b) => b.placement === 'tournaments_screen') && (
+                <option value="tournaments_screen">{t('placement_tournaments')}</option>
+              )}
             </select>
           </div>
 
@@ -412,6 +442,17 @@ export const BannersManagementPage = () => {
         <div className="p-16 flex flex-col items-center justify-center gap-3 bg-vsp-surface border border-vsp-border rounded-2xl">
           <Loader2 className="w-8 h-8 text-vsp-accent animate-spin" />
           <span className="text-xs text-vsp-textSecondary">{t('loading')}</span>
+        </div>
+      ) : loadError ? (
+        <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-8">
+          <EmptyState
+            isError={true}
+            title="فشل تحميل البيانات"
+            description={loadError}
+            actionLabel="إعادة المحاولة"
+            actionIcon={RefreshCw}
+            onAction={loadData}
+          />
         </div>
       ) : filteredBanners.length === 0 ? (
         <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-8">
@@ -614,9 +655,36 @@ export const BannersManagementPage = () => {
             </label>
 
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = null;
+                  fileInputRef.current.click();
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  validateAndSetFile(file);
+                }
+              }}
               className={`relative border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
-                imagePreviewUrl
+                isDragging
+                  ? 'border-vsp-accent bg-vsp-accent/10 scale-[1.01]'
+                  : imagePreviewUrl
                   ? 'border-vsp-accent/50 bg-vsp-card/30'
                   : 'border-vsp-border hover:border-vsp-accent hover:bg-vsp-card/50'
               }`}
@@ -624,7 +692,7 @@ export const BannersManagementPage = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png, image/jpeg, image/webp"
+                accept="image/*, .png, .jpg, .jpeg, .webp"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -690,8 +758,12 @@ export const BannersManagementPage = () => {
                 className="w-full px-3.5 py-2.5 bg-vsp-card border border-vsp-border rounded-xl text-xs text-white focus:outline-none focus:border-vsp-accent"
               >
                 <option value="home_slider">{t('placement_home_slider')}</option>
-                <option value="popup">{t('placement_popup')}</option>
-                <option value="tournaments_screen">{t('placement_tournaments')}</option>
+                {editingBanner && formData.placement === 'popup' && (
+                  <option value="popup">{t('placement_popup')} (أرشيف / غير نشط بالموبايل)</option>
+                )}
+                {editingBanner && formData.placement === 'tournaments_screen' && (
+                  <option value="tournaments_screen">{t('placement_tournaments')} (أرشيف / غير نشط بالموبايل)</option>
+                )}
               </select>
             </div>
           </div>

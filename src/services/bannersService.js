@@ -1,4 +1,5 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
+import { classifyError } from './adminService';
 
 class BannersService {
   get client() {
@@ -14,15 +15,33 @@ class BannersService {
     try {
       if (!file) throw new Error('No file provided');
 
-      const fileExt = file.name.split('.').pop();
+      const mimeMap = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+      };
+
+      const fileExt = file.name.split('.').pop().toLowerCase();
+      const mappedContentType = mimeMap[fileExt];
+
+      if (!mappedContentType) {
+        return {
+          success: false,
+          error: 'صيغة الملف غير مدعومة. يرجى رفع صورة بصيغة JPG أو PNG أو WebP فقط.',
+          errorType: 'VALIDATION_ERROR',
+        };
+      }
+
+      const contentType = mappedContentType || file.type || 'image/jpeg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const filePath = `banner_images/${fileName}`;
-
       const { data, error } = await this.client.storage
         .from('banners')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true,
+          contentType, // إضافة صريحة، تضمن قبول السيرفر وتفادي خطأ 400
         });
 
       if (error) {
@@ -41,7 +60,8 @@ class BannersService {
       };
     } catch (e) {
       console.error('Error uploading banner image:', e);
-      return { success: false, error: e.message || 'Failed to upload image' };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -71,7 +91,8 @@ class BannersService {
       return { success: true, data: data || [] };
     } catch (e) {
       console.error('Error fetching banners:', e);
-      return { success: false, error: e.message, data: [] };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type, data: [] };
     }
   }
 
@@ -155,7 +176,8 @@ class BannersService {
       return { success: true, data };
     } catch (e) {
       console.error('Error creating banner:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -193,7 +215,8 @@ class BannersService {
       return { success: true, data };
     } catch (e) {
       console.error('Error updating banner:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -218,7 +241,8 @@ class BannersService {
       return { success: true };
     } catch (e) {
       console.error('Error deleting banner:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 }

@@ -1,5 +1,21 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
 
+export function classifyError(e) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { type: 'offline', message: 'لا يوجد اتصال بالإنترنت' };
+  }
+  const msg = e?.message || e?.error_description || String(e || '');
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Network request failed')) {
+    return { type: 'network', message: 'تعذر الوصول للخادم، تحقق من اتصالك' };
+  }
+  if (e?.code === '57014' || msg.toLowerCase().includes('timeout')) {
+    return { type: 'timeout', message: 'استغرق الطلب وقتاً طويلاً، حاول مرة أخرى' };
+  }
+  return { type: 'server', message: msg || 'حدث خطأ غير متوقع' };
+}
+
+
+
 class AdminService {
   get client() {
     return supabaseAdmin || supabase;
@@ -104,7 +120,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in updateBookingDetails:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -124,7 +141,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in cancelBookingWithReason:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -139,7 +157,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in deleteBookingPermanently:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -237,7 +256,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in approveOwner:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -256,7 +276,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in rejectOwner:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -334,7 +355,8 @@ class AdminService {
       return { success: true, expiresAt };
     } catch (e) {
       console.error('Error in activateVspPro:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -353,7 +375,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in downgradeOwnerToBasic:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -400,7 +423,8 @@ class AdminService {
       return { success: true, user: userRes };
     } catch (e) {
       console.error('Error in createOwnerAndStadiumManually:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -480,7 +504,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in toggleUserBlockStatus:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -498,7 +523,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in resetNoShowCount:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -523,7 +549,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in deleteUserPermanently:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -542,7 +569,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in approveAdminUser:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -579,7 +607,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in updateChampionshipStatus:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -602,14 +631,38 @@ class AdminService {
 
   async prepareTournamentBracket(championshipId) {
     try {
-      const { data, error } = await this.client.rpc('prepare_tournament_bracket_atomic', {
+      // First try the new centralized atomic bracket generator
+      const { data, error } = await this.client.rpc('generate_tournament_bracket_atomic', {
         p_championship_id: championshipId,
+      });
+      if (error) {
+        // Fallback to prepare_tournament_bracket_atomic
+        const fallback = await this.client.rpc('prepare_tournament_bracket_atomic', {
+          p_championship_id: championshipId,
+        });
+        if (fallback.error) throw fallback.error;
+        return { success: true, data: fallback.data };
+      }
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in prepareTournamentBracket:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
+  async markChampionshipPrizeDelivered(championshipId, notes = '') {
+    try {
+      const { data, error } = await this.client.rpc('mark_championship_prize_delivered_atomic', {
+        p_championship_id: championshipId,
+        p_notes: notes,
       });
       if (error) throw error;
       return { success: true, data };
     } catch (e) {
-      console.error('Error in prepareTournamentBracket:', e);
-      return { success: false, error: e.message };
+      console.error('Error in markChampionshipPrizeDelivered:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -671,7 +724,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in resolveDispute:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -773,7 +827,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error setting 1v1 gate status:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -788,7 +843,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error wiping 1v1 registrations:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -818,7 +874,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error approving 1v1 registration:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -833,7 +890,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error rejecting 1v1 registration:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -847,7 +905,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error resetting 1v1 round:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -872,7 +931,8 @@ class AdminService {
       return { success: true, data };
     } catch (e) {
       console.error('Error adding 1v1 player:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -914,7 +974,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in publish1v1Standings:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -925,7 +986,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in wipe1v1TournamentData:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -948,7 +1010,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error updating 1v1 player stats:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -957,14 +1020,18 @@ class AdminService {
   // MODULE F.2: VSP 1v1 TOURNAMENT SYSTEM (NEW TABLES & ATOMIC RPC)
   // =========================================================================
 
-  async create1v1Tournament({ name, target_player_count, created_by = null }) {
+  async create1v1Tournament({ name, target_player_count, entry_fee = 0, scheduled_at = null, created_by = null, governorate = 'Cairo' }) {
     try {
       const { data, error } = await this.client
         .from('vsp_1v1_tournaments')
         .insert({
           name: name?.trim() || 'بطولة 1vs1 جديدة',
           target_player_count: parseInt(target_player_count) || 8,
-          status: 'draft',
+          entry_fee: parseFloat(entry_fee) || 0,
+          prize_pool: 0,
+          governorate: governorate || 'Cairo',
+          status: 'registration_open',
+          scheduled_at: scheduled_at || new Date(Date.now() + 86400000 * 3).toISOString(),
           created_by: created_by || null,
         })
         .select()
@@ -974,7 +1041,31 @@ class AdminService {
       return { success: true, data };
     } catch (e) {
       console.error('Error creating 1v1 tournament:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      if (e?.code === '23505' || e?.message?.includes('idx_one_active_1v1_tournament_per_governorate') || e?.message?.includes('unique constraint')) {
+        return { 
+          success: false, 
+          error: 'يوجد بطولة نشطة حالياً في هذه المحافظة (' + governorate + '). يجب إنهاء أو أرشفة البطولة الحالية أولاً قبل بدء بطولة جديدة لنفس المحافظة.', 
+          errorType: 'conflict' 
+        };
+      }
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
+  async mark1v1PrizeDelivered(tournamentId, notes = '') {
+    try {
+      const { data, error } = await this.client.rpc('mark_1v1_prize_delivered_atomic', {
+        p_tournament_id: tournamentId,
+        p_notes: notes?.trim() || null,
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل توثيق تسليم الجائزة');
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error marking 1v1 prize delivered:', e);
+      return { success: false, error: e.message || 'فشل توثيق تسليم الجائزة' };
     }
   }
 
@@ -1010,6 +1101,21 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error saving 1v1 tournament players:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
+  async update1v1TournamentStatus(tournamentId, status) {
+    try {
+      const { error } = await this.client
+        .from('vsp_1v1_tournaments')
+        .update({ status })
+        .eq('id', tournamentId);
+      if (error) throw error;
+      return { success: true };
+    } catch (e) {
+      console.error('Error updating 1v1 status:', e);
       return { success: false, error: e.message };
     }
   }
@@ -1018,9 +1124,18 @@ class AdminService {
     try {
       if (!tournamentId) throw new Error('Missing tournament ID');
 
-      const { data, error } = await this.client.rpc('publish_1v1_tournament_atomic', {
+      // Call new final standings RPC
+      const { data, error } = await this.client.rpc('publish_1v1_final_standings_atomic', {
         p_tournament_id: tournamentId,
       });
+      if (error) {
+        // Fallback to publish_1v1_tournament_atomic
+        const fb = await this.client.rpc('publish_1v1_tournament_atomic', {
+          p_tournament_id: tournamentId,
+        });
+        if (fb.error) throw fb.error;
+        return { success: true, data: fb.data };
+      }
 
       if (error) throw error;
       if (!data?.success) {
@@ -1030,17 +1145,24 @@ class AdminService {
       return { success: true, data };
     } catch (e) {
       console.error('Error publishing 1v1 tournament:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
-  async getActiveOrLatest1v1Tournament() {
+  async getActiveOrLatest1v1Tournament(governorate = null) {
     try {
-      // 1. Find currently published tournament, or latest draft
-      const { data: activeList, error: tErr } = await this.client
+      // 1. Find currently active tournament (registration_open, in_progress, completed, published)
+      let query = this.client
         .from('vsp_1v1_tournaments')
         .select('*')
-        .in('status', ['published', 'draft'])
+        .in('status', ['registration_open', 'in_progress', 'completed', 'published', 'draft']);
+
+      if (governorate) {
+        query = query.eq('governorate', governorate);
+      }
+
+      const { data: activeList, error: tErr } = await query
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -1049,10 +1171,14 @@ class AdminService {
       let tournament = activeList && activeList.length > 0 ? activeList[0] : null;
 
       if (!tournament) {
-        // Fallback to latest archived if neither published nor draft exists
-        const { data: archivedList, error: aErr } = await this.client
+        // Fallback to latest archived in this governorate (or overall)
+        let archQuery = this.client
           .from('vsp_1v1_tournaments')
-          .select('*')
+          .select('*');
+        if (governorate) {
+          archQuery = archQuery.eq('governorate', governorate);
+        }
+        const { data: archivedList, error: aErr } = await archQuery
           .order('created_at', { ascending: false })
           .limit(1);
         if (aErr) throw aErr;
@@ -1078,6 +1204,7 @@ class AdminService {
         name: p.player_name,
         user_id: p.user_id,
         avatar_url: p.avatar_url || '',
+        payment_status: p.payment_status || 'paid',
         tackles: p.tackles || 0,
         goals: p.goals || 0,
         skills: p.skills || 0,
@@ -1089,7 +1216,23 @@ class AdminService {
       return { success: true, tournament, players: mappedPlayers };
     } catch (e) {
       console.error('Error in getActiveOrLatest1v1Tournament:', e);
-      return { success: false, tournament: null, players: [], error: e.message };
+      const err = classifyError(e);
+      return { success: false, tournament: null, players: [], error: err.message, errorType: err.type };
+    }
+  }
+
+  async listActive1v1Tournaments() {
+    try {
+      const { data, error } = await this.client
+        .from('vsp_1v1_tournaments')
+        .select('*')
+        .in('status', ['registration_open', 'in_progress'])
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { success: true, tournaments: data || [] };
+    } catch (e) {
+      console.error('Error listing active 1v1 tournaments:', e);
+      return { success: false, tournaments: [], error: e.message };
     }
   }
 
@@ -1309,7 +1452,8 @@ class AdminService {
       return { success: true, referenceNumber: ref };
     } catch (e) {
       console.error('Error in recordSmartOwnerSettlement:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -1367,7 +1511,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in recordPayoutSettlement:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
@@ -1408,7 +1553,8 @@ class AdminService {
       return { success: true };
     } catch (e) {
       console.error('Error in setMaintenanceMode:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 

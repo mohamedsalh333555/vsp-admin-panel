@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { ShieldCheck, Lock, Mail, ArrowRight, Globe } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Globe } from 'lucide-react';
 
 export const LoginPage = () => {
   const { login } = useAuth();
-  const { t, toggleLanguage } = useLanguage();
+  const { t, lang, toggleLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -52,10 +52,6 @@ export const LoginPage = () => {
           </div>
           <h1 className="text-2xl font-black text-white tracking-wide">{t('app_title')}</h1>
           <p className="text-xs text-vsp-textSecondary mt-1">{t('login_sub')}</p>
-          <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[11px] font-medium text-amber-400">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>????? ??????? ???????? ?????? ???</span>
-          </div>
         </div>
 
         {error && (
@@ -77,7 +73,7 @@ export const LoginPage = () => {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full bg-vsp-card border border-vsp-border rounded-xl pr-10 pl-4 py-2.5 text-xs text-white placeholder-vsp-textSecondary focus:border-zinc-500 focus:outline-none"
-                placeholder="mohamedsalh333555@gmail.com"
+                placeholder="admin@vsp.com"
               />
             </div>
           </div>
@@ -94,7 +90,7 @@ export const LoginPage = () => {
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="w-full bg-vsp-card border border-vsp-border rounded-xl pr-10 pl-4 py-2.5 text-xs text-white placeholder-vsp-textSecondary focus:border-zinc-500 focus:outline-none"
-                placeholder="????????"
+                placeholder="••••••••"
               />
             </div>
           </div>
@@ -116,7 +112,7 @@ export const LoginPage = () => {
         </form>
 
         <div className="mt-6 text-center text-[11px] text-vsp-textSecondary">
-          <span>?????? VSP ???????? ? ?????? ???? ?????? ??????</span>
+          <span>{lang === 'ar' ? 'منظومة VSP الرياضية • لوحة الإدارة والتحكم' : 'VSP Sports Platform • Administration Panel'}</span>
         </div>
       </div>
     </div>
