@@ -408,15 +408,16 @@ export const OwnerSubscriptionsPage = () => {
                     <tr key={owner.id} className="hover:bg-vsp-card/30 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center font-bold text-white shrink-0 overflow-hidden">
+                          <div className="w-9 h-9 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center font-bold text-emerald-400 shrink-0 overflow-hidden">
                             {owner.profile_image_url ? (
                               <img
                                 src={owner.profile_image_url}
                                 alt=""
                                 className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
                               />
                             ) : (
-                              owner.name?.charAt(0) || 'M'
+                              owner.name?.trim()?.charAt(0) || 'م'
                             )}
                           </div>
                           <div>

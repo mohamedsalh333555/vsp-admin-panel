@@ -31,12 +31,18 @@ class AdminService {
         this.client.from('stadiums').select('*', { count: 'exact', head: true }),
         this.client.from('bookings').select('id, total_price, status'),
         this.client.from('vsp_1vs1_players').select('*', { count: 'exact', head: true }),
-        this.client.from('users').select('id, role, has_stadium, verification_status, additional_data').or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending'),
+        this.client
+          .from('users')
+          .select('id, role, has_stadium, verification_status, additional_data')
+          .or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending')
+          .not('role', 'in', '("admin","super_admin","co_founder","cofounder")'),
         this.client.from('bookings').select('*', { count: 'exact', head: true }).or('match_result_status.eq.disputed,status.eq.disputed'),
         this.client.from('payout_settlements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
 
       const pendingOwnersCount = (pendingOwnersRes.data || []).filter((u) => {
+        const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(u.role?.toLowerCase());
+        if (isAdminRole) return false;
         const isPending = u.verification_status === 'pending' || !u.verification_status;
         const hasOwnerIntent =
           u.role === 'owner' ||
@@ -172,6 +178,7 @@ class AdminService {
           .from('users')
           .select('*')
           .or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending')
+          .not('role', 'in', '("admin","super_admin","co_founder","cofounder")')
           .order('created_at', { ascending: false }),
         this.client
           .from('stadiums')
@@ -184,6 +191,8 @@ class AdminService {
       const unverifiedOwnerIds = new Set((unverifiedStadiumsRes.data || []).map((s) => s.owner_id));
 
       return (usersRes.data || []).filter((u) => {
+        const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(u.role?.toLowerCase());
+        if (isAdminRole) return false;
         const isPending = u.verification_status === 'pending' || !u.verification_status;
         const hasUnverifiedStadium = unverifiedOwnerIds.has(u.id);
         const hasOwnerIntent =
@@ -287,6 +296,7 @@ class AdminService {
         .from('users')
         .select('*')
         .or('role.eq.owner,has_stadium.eq.true')
+        .not('role', 'in', '("admin","super_admin","co_founder","cofounder")')
         .order('created_at', { ascending: false });
 
       if (searchQuery && searchQuery.trim()) {
@@ -442,7 +452,7 @@ class AdminService {
 
       if (roleFilter !== 'all') {
         if (roleFilter === 'owner') {
-          query = query.or('role.eq.owner,has_stadium.eq.true');
+          query = query.or('role.eq.owner,has_stadium.eq.true').not('role', 'in', '("admin","super_admin","co_founder","cofounder")');
         } else if (roleFilter === 'player') {
           query = query.eq('role', 'player').or('has_stadium.eq.false,has_stadium.is.null');
         } else {
