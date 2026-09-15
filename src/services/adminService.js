@@ -91,7 +91,7 @@ class AdminService {
     try {
       const { data, error } = await this.client
         .from('bookings')
-        .select('id, created_at, start_time, end_time, total_price, status, deposit_paid, is_deposit_paid, cancellation_reason, stadium_id, user_id, stadiums(name, governorate), users(name, phone, email)')
+        .select('id, created_at, start_time, end_time, total_price, payment_method, payment_status, status, deposit_paid, is_deposit_paid, cancellation_reason, refund_amount, refund_transaction_id, refunded_at, refund_payment_method, stadium_id, user_id, stadiums(name, governorate), users(name, phone, email)')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -1156,6 +1156,47 @@ class AdminService {
     } catch (e) {
       console.error('Error updating 1v1 status:', e);
       return { success: false, error: e.message };
+    }
+  }
+
+  async saveAndPublish1v1Tournament({ tournamentId, playersList, fallbackStatus = 'registration_open' }) {
+    try {
+      if (!tournamentId) throw new Error('Missing tournament ID');
+
+      // 1. Try single atomic RPC if implemented on Supabase
+      try {
+        const { data: atomicData, error: atomicErr } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
+          p_tournament_id: tournamentId,
+          p_players: playersList,
+        });
+        if (!atomicErr && atomicData?.success) {
+          return { success: true, data: atomicData };
+        }
+      } catch (rpcErr) {
+        // Fall back to 2-step transaction below
+      }
+
+      // 2. Fallback: 2-step transaction with manual rollback
+      // Step A: Save players
+      const saveRes = await this.save1v1TournamentPlayers(tournamentId, playersList);
+      if (!saveRes.success) {
+        throw new Error(saveRes.error || 'فشل حفظ بيانات درجات اللاعبين');
+      }
+
+      // Step B: Publish tournament
+      const pubRes = await this.publish1v1Tournament(tournamentId);
+      if (!pubRes.success) {
+        // Rollback status to previous status
+        console.warn('Publish failed, executing status rollback to:', fallbackStatus);
+        await this.update1v1TournamentStatus(tournamentId, fallbackStatus);
+        throw new Error(pubRes.error || 'فشل نشر الترتيب النهائي، وتم التراجع عن حالة البطولة');
+      }
+
+      return { success: true, data: pubRes.data };
+    } catch (e) {
+      console.error('Error in saveAndPublish1v1Tournament:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 

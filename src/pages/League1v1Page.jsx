@@ -298,13 +298,16 @@ export const League1v1Page = () => {
  ]);
  };
 
- const handleDeletePlayerRow = (index) => {
- if (players.length <= 2) {
- setAlert({ type: 'error', message: 'يجب أن تحتوي البطولة على لاعبين اثنين على الأقل.' });
- return;
- }
- setPlayers((prev) => prev.filter((_, i) => i !== index));
- };
+  const handleDeletePlayerRow = (index) => {
+    if (players.length <= 2) {
+      setAlert({ type: 'error', message: 'يجب أن تحتوي البطولة على لاعبين اثنين على الأقل.' });
+      return;
+    }
+    if (!window.confirm('هل أنت متأكد من حذف هذا اللاعب؟')) {
+      return;
+    }
+    setPlayers((prev) => prev.filter((_, i) => i !== index));
+  };
 
  const handleConfirmPrizeDelivery = async (e) => {
  e?.preventDefault();
@@ -360,68 +363,92 @@ export const League1v1Page = () => {
  }
  };
 
- // -------------------------------------------------------------------------
- // 3. SAVE DRAFT (حفظ كمسودة دون نشر)
- // -------------------------------------------------------------------------
- const handleSaveDraft = async () => {
- if (!activeTournament?.id) {
- setAlert({ type: 'error', message: 'لا توجد بطولة نشطة للحفظ.' });
- return;
- }
+  // -------------------------------------------------------------------------
+  // 3. SAVE DRAFT (حفظ كمسودة دون نشر - حساب النقاط في الباك إند)
+  // -------------------------------------------------------------------------
+  const handleSaveDraft = async () => {
+    if (!activeTournament?.id) {
+      setAlert({ type: 'error', message: 'لا توجد بطولة نشطة للحفظ.' });
+      return;
+    }
 
- try {
- setProcessing(true);
- const res = await adminService.save1v1TournamentPlayers(activeTournament.id, players);
- if (!res.success) throw new Error(res.error || 'فشل حفظ المسودة');
+    try {
+      setProcessing(true);
+      // تنقية بيانات اللاعبين: إرسال tackles و goals و skills فقط للباك إند لحساب total_points
+      const cleanPlayers = players.map((p, idx) => ({
+        player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
+        user_id: p.user_id || null,
+        avatar_url: p.avatar_url || null,
+        tackles: Math.max(0, parseInt(p.tackles) || 0),
+        goals: Math.max(0, parseInt(p.goals) || 0),
+        skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+      }));
 
- setAlert({ type: 'success', message: 'تم حفظ مسودة درجات اللاعبين بنجاح! ' });
- } catch (e) {
- console.error('Error saving draft:', e);
- setAlert({ type: 'error', message: 'فشل حفظ المسودة: ' + e.message });
- } finally {
- setProcessing(false);
- }
- };
+      const res = await adminService.save1v1TournamentPlayers(activeTournament.id, cleanPlayers);
+      if (!res.success) throw new Error(res.error || 'فشل حفظ المسودة');
 
- // -------------------------------------------------------------------------
- // 4. PUBLISH TOURNAMENT (نشر الترتيب عبر الفانكشن الذري)
- // -------------------------------------------------------------------------
- const handlePublishTournament = async () => {
- if (!activeTournament?.id) {
- setAlert({ type: 'error', message: 'لا توجد بطولة نشطة للنشر.' });
- return;
- }
+      setAlert({ type: 'success', message: 'تم حفظ مسودة درجات اللاعبين بنجاح! 💾' });
+    } catch (e) {
+      console.error('Error saving draft:', e);
+      setAlert({ type: 'error', message: 'فشل حفظ المسودة: ' + e.message });
+    } finally {
+      setProcessing(false);
+    }
+  };
 
- const confirmMsg = `هل أنت متأكد من رغبتك في نشر الترتيب النهائي للبطولة (${activeTournament.name})؟\n\nسيتم أرشفة أي بطولة سابقة ونشر هذا الترتيب فوراً على تطبيق الموبايل لجميع اللاعبين!`;
- if (!window.confirm(confirmMsg)) return;
+  // -------------------------------------------------------------------------
+  // 4. PUBLISH TOURNAMENT (نشر الترتيب ذرياً مع آلية Rollback تلقائية)
+  // -------------------------------------------------------------------------
+  const handlePublishTournament = async () => {
+    if (!activeTournament?.id) {
+      setAlert({ type: 'error', message: 'لا توجد بطولة نشطة للنشر.' });
+      return;
+    }
 
- try {
- setProcessing(true);
+    const confirmMsg = `هل أنت متأكد من رغبتك في نشر الترتيب النهائي للبطولة (${activeTournament.name})؟\n\nسيتم أرشفة أي بطولة سابقة ونشر هذا الترتيب فوراً على تطبيق الموبايل لجميع اللاعبين!`;
+    if (!window.confirm(confirmMsg)) return;
 
- // Step 1: Save current players to ensure table is 100% up to date
- const saveRes = await adminService.save1v1TournamentPlayers(activeTournament.id, players);
- if (!saveRes.success) throw new Error(saveRes.error || 'فشل حفظ اللاعبين قبل النشر');
+    const previousStatus = activeTournament.status || 'registration_open';
 
- // Step 2: Call the atomic RPC function: publish_1v1_tournament_atomic
- const pubRes = await adminService.publish1v1Tournament(activeTournament.id);
- if (!pubRes.success) {
- throw new Error(pubRes.error || 'فشل نشر البطولة');
- }
+    try {
+      setProcessing(true);
 
- setAlert({
- type: 'success',
- message: ' تم حفظ ونشر الترتيب النهائي بنجاح! الترتيب معروض الآن مباشرة على هواتف اللاعبين.',
- });
+      // تنقية بيانات اللاعبين دون الاعتماد على total_points المحسوب بالواجهة
+      const cleanPlayers = players.map((p, idx) => ({
+        player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
+        user_id: p.user_id || null,
+        avatar_url: p.avatar_url || null,
+        tackles: Math.max(0, parseInt(p.tackles) || 0),
+        goals: Math.max(0, parseInt(p.goals) || 0),
+        skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+      }));
 
- // Reload updated tournament and players
- await loadData();
- } catch (e) {
- console.error('Error publishing tournament:', e);
- setAlert({ type: 'error', message: 'فشل النشر: ' + e.message });
- } finally {
- setProcessing(false);
- }
- };
+      // استدعاء الحفظ والنشر الذري مع آلية Rollback
+      const pubRes = await adminService.saveAndPublish1v1Tournament({
+        tournamentId: activeTournament.id,
+        playersList: cleanPlayers,
+        fallbackStatus: previousStatus,
+      });
+
+      if (!pubRes.success) {
+        throw new Error(pubRes.error || 'فشل نشر البطولة');
+      }
+
+      setAlert({
+        type: 'success',
+        message: '🚀 تم حفظ ونشر الترتيب النهائي بنجاح! الترتيب معروض الآن مباشرة على هواتف اللاعبين.',
+      });
+
+      // Reload updated tournament and players
+      await loadData();
+    } catch (e) {
+      console.error('Error publishing tournament:', e);
+      setAlert({ type: 'error', message: 'فشل النشر: ' + e.message });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
 
  // -------------------------------------------------------------------------
  // 5. VIEW ARCHIVE DETAILS

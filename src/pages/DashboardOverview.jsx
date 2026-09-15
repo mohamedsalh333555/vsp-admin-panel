@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../services/adminService';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../context/LanguageContext';
@@ -748,6 +748,33 @@ export const DashboardOverview = ({ onNavigate }) => {
                   className="w-full bg-vsp-card border border-rose-500/30 rounded-xl p-3 text-xs text-white focus:border-rose-400 focus:outline-none"
                   placeholder={t('cancellation_reason_placeholder')}
                 />
+              </div>
+            )}
+
+                        {/* Smart Refund Details Box */}
+            {selectedBooking && (selectedBooking.status === 'cancelled' || selectedBooking.payment_status === 'refunded') && (selectedBooking.refund_amount > 0 || selectedBooking.refund_transaction_id) && (
+              <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400">
+                    {isAr ? 'بيانات الاسترداد المالي الذكي' : 'Smart Refund Details'}
+                  </span>
+                  <span className="font-mono font-bold text-white">
+                    {selectedBooking.refund_amount || selectedBooking.deposit_paid || selectedBooking.total_price} {t('currency')}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span>
+                    {isAr ? 'القناة:' : 'Channel:'} {selectedBooking.refund_payment_method === 'wallet' ? (isAr ? 'محفظة إلكترونية 📱' : 'E-Wallet 📱') : (isAr ? 'بطاقة بنكية 🏦' : 'Bank Card 🏦')}
+                  </span>
+                  {selectedBooking.refund_transaction_id && (
+                    <span className="font-mono">Ref: #{selectedBooking.refund_transaction_id}</span>
+                  )}
+                </div>
+                {selectedBooking.refunded_at && (
+                  <div className="text-[10px] text-zinc-500 font-mono">
+                    {new Date(selectedBooking.refunded_at).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
+                  </div>
+                )}
               </div>
             )}
 

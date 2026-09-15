@@ -194,6 +194,9 @@ export type Database = {
           proposed_start_time: string | null
           receipt_url: string | null
           refund_amount: number | null
+            refund_transaction_id: string | null
+            refunded_at: string | null
+            refund_payment_method: string | null
           rent_ball: boolean | null
           requires_admin_intervention: boolean | null
           reschedule_status: string | null
@@ -278,6 +281,9 @@ export type Database = {
           proposed_start_time?: string | null
           receipt_url?: string | null
           refund_amount?: number | null
+            refund_transaction_id?: string | null
+            refunded_at?: string | null
+            refund_payment_method?: string | null
           rent_ball?: boolean | null
           requires_admin_intervention?: boolean | null
           reschedule_status?: string | null
@@ -362,6 +368,9 @@ export type Database = {
           proposed_start_time?: string | null
           receipt_url?: string | null
           refund_amount?: number | null
+            refund_transaction_id?: string | null
+            refunded_at?: string | null
+            refund_payment_method?: string | null
           rent_ball?: boolean | null
           requires_admin_intervention?: boolean | null
           reschedule_status?: string | null
@@ -1776,6 +1785,7 @@ export type Database = {
           is_blocked: boolean
           is_email_verified: boolean | null
           is_identity_verified: boolean | null
+          is_onboarding_confirmed: boolean
           is_registration_complete: boolean | null
           last_seen: string | null
           last_warning: string | null
@@ -1810,6 +1820,7 @@ export type Database = {
           is_blocked?: boolean
           is_email_verified?: boolean | null
           is_identity_verified?: boolean | null
+          is_onboarding_confirmed?: boolean
           is_registration_complete?: boolean | null
           last_seen?: string | null
           last_warning?: string | null
@@ -1844,6 +1855,7 @@ export type Database = {
           is_blocked?: boolean
           is_email_verified?: boolean | null
           is_identity_verified?: boolean | null
+          is_onboarding_confirmed?: boolean
           is_registration_complete?: boolean | null
           last_seen?: string | null
           last_warning?: string | null
@@ -1987,6 +1999,30 @@ export type Database = {
       }
     }
     Views: {
+      v_bookings_with_refund: {
+        Row: {
+          id: string
+          created_by_user_id: string | null
+          owner_id: string | null
+          stadium_name: string | null
+          start_time: string | null
+          end_time: string | null
+          total_price: number | null
+          payment_method: string | null
+          payment_status: string | null
+          status: string | null
+          refund_amount: number | null
+          refund_transaction_id: string | null
+          refunded_at: string | null
+          refund_payment_method: string | null
+          cancelled_at: string | null
+          platform_fee: number | null
+          refund_channel: string | null
+          refund_eta: string | null
+          display_refund_ref: string | null
+        }
+        Relationships: []
+      }
       admin_pending_refunds: {
         Row: {
           booking_date: string | null
@@ -1997,6 +2033,9 @@ export type Database = {
           player_name: string | null
           player_phone: string | null
           refund_amount: number | null
+            refund_transaction_id: string | null
+            refunded_at: string | null
+            refund_payment_method: string | null
           stadium_name: string | null
         }
         Insert: {
