@@ -110,6 +110,25 @@ class AdminService {
     }
   }
 
+  
+  // تأكيد تحصيل الحجز كاش بصورة ذرية وتأمين وسيلة الدفع cash
+  async confirmCashBooking(bookingId, ownerId, totalPrice, collectedAmount = null) {
+    try {
+      const { data, error } = await this.client.rpc('confirm_cash_booking_atomic', {
+        p_booking_id: bookingId,
+        p_owner_id: ownerId,
+        p_total_price: totalPrice,
+        p_collected_amount: collectedAmount,
+      });
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in confirmCashBooking:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
   async updateBookingDetails(bookingId, updates) {
     try {
       const payload = {
