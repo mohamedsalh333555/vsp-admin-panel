@@ -192,9 +192,8 @@ const COFOUNDER_EMAILS = [
         );
       }
       return (
-        <Badge variant="warning" size="sm">
-          <Building2 className="w-3 h-3 inline ml-1" />
-          <span>{isAr ? 'صاحب ملعب (معتمد)' : 'Owner (Approved)'}</span>
+        <Badge variant="default" size="sm">
+          {t('owner')}
         </Badge>
       );
     }
