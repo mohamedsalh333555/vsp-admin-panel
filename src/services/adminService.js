@@ -1445,13 +1445,14 @@ class AdminService {
           const price = Number(b.total_price || 0);
           const deposit = Number(b.deposit_paid || 0);
           const method = (b.payment_method || '').toLowerCase().trim();
-          const isCash = method === 'cash' || method.includes('كاش');
-          const hasOnlineTxn = Boolean(b.paymob_transaction_id) || Boolean(b.payment_transaction_id);
-          const isOnlineMethod = method === 'online' || method === 'paymob' || method === 'card' || method === 'wallet';
+          const paymentSource = (b.payment_source || '').toLowerCase().trim();
+          const hasOnlineTxn = Boolean(b.paymob_transaction_id) || Boolean(b.payment_transaction_id) || Boolean(b.paymob_order_id);
+          const isOnlineMethod = method === 'online' || method === 'paymob' || method === 'card' || method === 'wallet' || paymentSource === 'paymob';
+          const isOnlineDeposit = b.is_deposit_paid || deposit > 0;
+          const isFlutterOnline = paymentSource !== 'cash' && paymentSource !== '';
 
-          // Strictly mirror Flutter mobile app: cash bookings are collected by owner on-site
-          // Only true online methods or Paymob transaction IDs represent digital funds held by platform
-          const isOnline = !isCash && (isOnlineMethod || hasOnlineTxn || b.payment_status === 'paid' || b.is_paid);
+          // A booking is considered online/platform-collected if paid digitally, has deposit paid, or payment_source is not cash
+          const isOnline = isOnlineDeposit || hasOnlineTxn || isOnlineMethod || isFlutterOnline;
           const collected = (deposit > 0 && deposit < price) ? deposit : price;
 
           grossVolume += price;
