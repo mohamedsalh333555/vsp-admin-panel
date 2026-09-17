@@ -1440,15 +1440,22 @@ class AdminService {
         ownerBookings.forEach((b) => {
           const price = Number(b.total_price || 0);
           const deposit = Number(b.deposit_paid || 0);
-          const isOnline = b.is_deposit_paid || deposit > 0 || b.paymob_transaction_id;
+          const isCash = !b.payment_method || b.payment_method.toLowerCase() === 'cash';
+          const isOnline =
+            b.is_deposit_paid ||
+            deposit > 0 ||
+            Boolean(b.paymob_transaction_id) ||
+            Boolean(b.payment_transaction_id) ||
+            (!isCash && (b.payment_status === 'paid' || b.is_paid));
           const collected = deposit > 0 ? deposit : price;
 
           grossVolume += price;
 
           if (isOnline) {
             onlineCollected += collected;
-            // Pure 2% platform commission ONLY on online collected bookings
-            const fee = Math.round(collected * 0.02 * 100) / 100;
+            // Check if server-recorded vsp_commission exists, otherwise apply pure 2% platform fee
+            const serverFee = Number(b.vsp_commission || 0);
+            const fee = serverFee > 0 ? serverFee : Math.round(collected * 0.02 * 100) / 100;
             platformCommission += fee;
           }
         });
