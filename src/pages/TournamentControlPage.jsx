@@ -185,10 +185,10 @@ export const TournamentControlPage = () => {
           title="تأكيد إطلاق القرعة وتوليد شجرة المباريات"
         >
           <div className="space-y-4">
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-200/90 leading-relaxed">
-                <p className="font-bold text-amber-300 mb-1">
+            <div className="p-3 bg-zinc-800/80 border border-zinc-700 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300 leading-relaxed">
+                <p className="font-bold text-white mb-1">
                   تنبيه أمني وتنظيمي:
                 </p>
                 سيتم سحب الفرق عشوائياً وتوليد شجرة الأدوار والإقصائيات فوراً.
@@ -463,7 +463,7 @@ export const TournamentControlPage = () => {
           onClick={() => setActiveTab('pending')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative ${
             activeTab === 'pending'
-              ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
               : 'bg-vsp-surface hover:bg-vsp-card text-zinc-400 hover:text-white border border-vsp-border'
           }`}
         >
@@ -474,7 +474,7 @@ export const TournamentControlPage = () => {
               className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                 activeTab === 'pending'
                   ? 'bg-black/20 text-black'
-                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse'
               }`}
             >
               {pendingTournaments.length}
@@ -503,12 +503,12 @@ export const TournamentControlPage = () => {
               return (
                 <div
                   key={champ.id}
-                  className="bg-vsp-surface border border-amber-500/30 hover:border-amber-500/50 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between shadow-lg shadow-amber-500/5"
+                  className="bg-vsp-surface border border-zinc-700 hover:border-emerald-500/50 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between shadow-lg shadow-emerald-500/5"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-bold text-white text-sm line-clamp-1">{champ.name}</h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
                         بانتظار المراجعة
                       </span>
                     </div>
@@ -519,12 +519,12 @@ export const TournamentControlPage = () => {
 
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-vsp-border/50 text-xs">
                       <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                        <Users className="w-3.5 h-3.5 text-amber-400" />
+                        <Users className="w-3.5 h-3.5 text-zinc-400" />
                         <span>{champ.max_teams || 16} {t('teams_count_col')}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                        <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                        <MapPin className="w-3.5 h-3.5 text-zinc-400" />
                         <span>{champ.governorate || 'القاهرة'}</span>
                       </div>
 
@@ -653,7 +653,7 @@ export const TournamentControlPage = () => {
                           تم التسليم
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
                           بانتظار التسليم
                         </span>
                       )}

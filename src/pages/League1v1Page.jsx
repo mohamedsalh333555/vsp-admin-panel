@@ -485,7 +485,7 @@ export const League1v1Page = () => {
  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-vsp-surface p-6 rounded-2xl border border-vsp-border shadow-xl">
  <div>
  <div className="flex items-center gap-3 mb-1">
- <span className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400">
+ <span className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
  <Trophy className="w-7 h-7" />
  </span>
  <div>
