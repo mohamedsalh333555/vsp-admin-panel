@@ -26,30 +26,38 @@ class AdminService {
   // =========================================================================
   async fetchDashboardStats() {
     try {
-      const [usersRes, stadiumsRes, bookingsRes, league1v1Res, pendingOwnersRes, disputesRes, payoutsRes] = await Promise.all([
+      const [
+        usersRes,
+        stadiumsRes,
+        bookingsRes,
+        league1v1Res,
+        pendingOwners,
+        disputesRes,
+        financialOverview,
+      ] = await Promise.all([
         this.client.from('users').select('*', { count: 'exact', head: true }),
         this.client.from('stadiums').select('*', { count: 'exact', head: true }),
         this.client.from('bookings').select('id, total_price, status'),
         this.client.from('vsp_1vs1_players').select('*', { count: 'exact', head: true }),
-        this.client
-          .from('users')
-          .select('id, role, has_stadium, verification_status, additional_data')
-          .or('role.eq.owner,has_stadium.eq.true,verification_status.eq.pending')
-          .not('role', 'in', '("admin","super_admin","co_founder","cofounder")'),
+        this.fetchPendingOwners().catch(() => []),
         this.client.from('bookings').select('*', { count: 'exact', head: true }).or('match_result_status.eq.disputed,status.eq.disputed'),
-        this.client.from('payout_settlements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        this.fetchFinancialOverview().catch(() => null),
       ]);
 
-      const pendingOwnersCount = (pendingOwnersRes.data || []).filter((u) => {
-        const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(u.role?.toLowerCase());
-        if (isAdminRole) return false;
-        const isPending = u.verification_status === 'pending' || !u.verification_status;
-        const hasOwnerIntent =
-          u.role === 'owner' ||
-          u.has_stadium === true ||
-          Boolean(u.additional_data?.verificationDocuments);
-        return isPending && hasOwnerIntent && u.verification_status !== 'approved';
-      }).length;
+      // Calculate total 1v1 players from both global roster and active tournament rosters
+      let total1v1Players = league1v1Res?.count || 0;
+      if (total1v1Players === 0) {
+        try {
+          const tPlayersRes = await this.client.from('vsp_1v1_tournament_players').select('*', { count: 'exact', head: true });
+          total1v1Players = tPlayersRes?.count || 0;
+        } catch (_) {}
+      }
+
+      // Pending owners count strictly mirrors the Owner Audits page
+      const pendingOwnersCount = Array.isArray(pendingOwners) ? pendingOwners.length : 0;
+
+      // Pending payouts: Net owner dues awaiting disbursement from collected online bookings
+      const pendingPayoutsAmount = financialOverview?.kpis?.totalPendingOwnerDues ?? 0;
 
       let totalRevenue = 0;
       let activeBookingsCount = 0;
@@ -66,10 +74,10 @@ class AdminService {
         totalStadiums: stadiumsRes.count || 0,
         totalBookings: activeBookingsCount || bookingsRes.data?.length || 0,
         totalRevenue,
-        total1v1Players: league1v1Res.count || 0,
+        total1v1Players,
         pendingOwners: pendingOwnersCount,
         disputesCount: disputesRes.count || 0,
-        pendingPayouts: payoutsRes.count || 0,
+        pendingPayouts: pendingPayoutsAmount,
       };
     } catch (e) {
       console.error('Error in fetchDashboardStats:', e);
