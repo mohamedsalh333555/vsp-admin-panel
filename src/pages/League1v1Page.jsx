@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
  Trophy, 
  Users, 
@@ -485,7 +485,7 @@ export const League1v1Page = () => {
  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-vsp-surface p-6 rounded-2xl border border-vsp-border shadow-xl">
  <div>
  <div className="flex items-center gap-3 mb-1">
- <span className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+ <span className="p-2.5 bg-vsp-card border border-vsp-border rounded-xl text-zinc-300">
  <Trophy className="w-7 h-7" />
  </span>
  <div>
@@ -511,7 +511,7 @@ export const League1v1Page = () => {
  <button
  onClick={handleOpenNewTournamentModal}
  disabled={processing}
- className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+ className="flex items-center gap-2 px-5 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
  >
  <Plus className="w-4 h-4 stroke-[3]" />
  <span>بدء بطولة جديدة</span>
@@ -526,13 +526,13 @@ export const League1v1Page = () => {
  <div
  className={`p-4 rounded-xl flex items-center justify-between gap-3 border transition-all ${
  alert.type === 'success'
- ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+ ? 'bg-vsp-card border border-vsp-border text-vsp-accent'
  : 'bg-red-500/15 border-red-500/30 text-red-300'
  }`}
  >
  <div className="flex items-center gap-2 text-xs font-bold">
  {alert.type === 'success' ? (
- <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+ <CheckCircle2 className="w-5 h-5 text-vsp-accent flex-shrink-0" />
  ) : (
  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
  )}
@@ -559,7 +559,7 @@ export const League1v1Page = () => {
  <Trophy className="w-4 h-4" />
  <span>شيت الرصد والبطولة الحالية</span>
  {activeTournament?.status === 'published' && (
- <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+ <span className="w-2 h-2 rounded-full bg-vsp-accent animate-pulse"></span>
  )}
  </button>
 
@@ -601,7 +601,7 @@ export const League1v1Page = () => {
   {/* Governorate Selection Bar */}
   <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
    <div className="flex items-center gap-3">
-    <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+    <div className="p-2 bg-vsp-card border border-vsp-border rounded-xl text-zinc-400">
      <MapPin className="w-5 h-5" />
     </div>
     <div>
@@ -638,7 +638,7 @@ export const League1v1Page = () => {
         onClick={() => handleGovernorateChange(t.governorate)}
         className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
          selectedGovernorate?.toLowerCase() === t.governorate?.toLowerCase()
-          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+          ? 'bg-zinc-100 border-zinc-200 text-black font-extrabold'
           : 'bg-vsp-card border-vsp-border text-zinc-400 hover:text-white'
         }`}
        >
@@ -657,7 +657,7 @@ export const League1v1Page = () => {
    </div>
   ) : !activeTournament ? (
    <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-10 text-center space-y-4">
-    <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+    <div className="w-14 h-14 mx-auto rounded-2xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
      <Trophy className="w-7 h-7" />
     </div>
     <div>
@@ -668,7 +668,7 @@ export const League1v1Page = () => {
     </div>
     <button
      onClick={() => handleOpenNewTournamentModal(selectedGovernorate)}
-     className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+     className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
     >
      <Plus className="w-4 h-4 stroke-[3]" />
      <span>بدء بطولة جديدة في {getGovArabicName(selectedGovernorate)}</span>
@@ -681,7 +681,7 @@ export const League1v1Page = () => {
      <div>
       <div className="flex items-center gap-3 flex-wrap">
        <h2 className="text-lg font-black text-white">{activeTournament.name}</h2>
-       <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+       <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-vsp-card text-zinc-300 border border-vsp-border flex items-center gap-1">
         <MapPin className="w-3.5 h-3.5" />
         {getGovArabicName(activeTournament.governorate)}
        </span>
@@ -716,7 +716,7 @@ export const League1v1Page = () => {
          <span>•</span>
          <span>
           نُشرت في:{' '}
-          <strong className="text-emerald-400">
+          <strong className="text-zinc-300 font-black">
            {new Date(activeTournament.published_at).toLocaleTimeString('ar-EG', {
             hour: '2-digit',
             minute: '2-digit',
@@ -734,7 +734,7 @@ export const League1v1Page = () => {
  <button
  onClick={() => handleToggleStatus('in_progress')}
  disabled={processing}
- className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-xl transition-all"
+ className="flex items-center gap-2 px-4 py-2.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-zinc-200 text-xs font-bold rounded-xl transition-all"
  >
  <span>إغلاق التسجيل وبدء الرصد </span>
  </button>
@@ -760,7 +760,7 @@ export const League1v1Page = () => {
  <button
  onClick={handlePublishTournament}
  disabled={processing}
- className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+ className="flex items-center gap-2 px-6 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
  >
  {processing ? (
  <Loader2 className="w-4 h-4 animate-spin" />
@@ -777,18 +777,18 @@ export const League1v1Page = () => {
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-5 shadow-lg flex items-center justify-between">
  <div>
  <div className="flex items-center gap-2">
- <Coins className="w-4 h-4 text-emerald-400" />
+ <Coins className="w-4 h-4 text-vsp-accent" />
  <span className="text-[11px] font-bold text-vsp-textSecondary uppercase tracking-wider block">وعاء الجائزة المتراكم</span>
  </div>
  <div className="flex items-baseline gap-2 mt-2">
  <span className="text-2xl font-black text-white">{activeTournament.prize_pool || 0}</span>
- <span className="text-xs font-bold text-emerald-400">ج.م</span>
+ <span className="text-xs font-bold text-zinc-300 font-black">ج.م</span>
  </div>
  <span className="text-[11px] text-vsp-textSecondary mt-1 block">
  مجموع رسوم {players.filter(p => p.payment_status === 'paid').length || 0} لاعب مسدد بنجاح
  </span>
  </div>
- <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-emerald-400">
+ <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-300 font-black">
  <Trophy className="w-5 h-5" />
  </div>
  </div>
@@ -850,7 +850,7 @@ export const League1v1Page = () => {
  </div>
  <h3 className="text-lg font-black text-white mt-1.5 flex items-baseline gap-2">
  <span>الجائزة المستحقة:</span>
- <span className="text-emerald-400 text-xl font-black">{activeTournament.prize_pool || 0} ج.م</span>
+ <span className="text-white text-xl font-black">{activeTournament.prize_pool || 0} ج.م</span>
  <span className="text-xs font-bold text-vsp-textSecondary">
  للبطل: {activeTournament.champion_name || players[0]?.player_name || 'بطل البطولة'}
  </span>
@@ -863,9 +863,9 @@ export const League1v1Page = () => {
 
  <div>
  {activeTournament.prize_delivered ? (
- <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 flex flex-col items-end gap-1">
- <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
- <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+ <div className="bg-vsp-card border border-vsp-border rounded-xl p-3.5 flex flex-col items-end gap-1">
+ <div className="flex items-center gap-2 text-zinc-300 font-bold text-xs">
+ <CheckCircle2 className="w-4 h-4 text-vsp-accent" />
  <span>تم تسليم الجائزة رسمياً</span>
  </div>
  <span className="text-[11px] text-vsp-textSecondary">
@@ -880,7 +880,7 @@ export const League1v1Page = () => {
  ) : (
  <button
  onClick={() => setShowPrizeDeliveryModal(true)}
- className="flex items-center gap-2 px-5 py-2.5 bg-vsp-accent hover:bg-emerald-400 text-black font-bold text-xs rounded-xl shadow transition-all active:scale-95"
+ className="flex items-center gap-2 px-5 py-2.5 bg-vsp-accent hover:bg-vsp-accentHover text-black font-bold text-xs rounded-xl shadow transition-all active:scale-95"
  >
  <Award className="w-4 h-4" />
  <span>تسجيل تسليم الجائزة يدوياً</span>
@@ -892,16 +892,16 @@ export const League1v1Page = () => {
  )}
 
  {/* Scoring Formula Info Banner */}
- <div className="p-4 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-between gap-4 text-xs">
- <div className="flex items-center gap-3 text-emerald-300 font-bold">
- <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+ <div className="p-4 bg-vsp-card/50 border border-vsp-border rounded-xl flex items-center justify-between gap-4 text-xs">
+ <div className="flex items-center gap-3 text-zinc-300 font-bold">
+ <Sparkles className="w-5 h-5 text-zinc-400 flex-shrink-0" />
  <span>
  معادلة رصد النقاط الواقعية: المجموع = [تدخل صحيح (تاكلينج) × 1] + [أهداف × 1] + [مهارات × 1].
  </span>
  </div>
  <button
  onClick={handleAddPlayerRow}
- className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs rounded-lg transition-all"
+ className="flex items-center gap-1.5 px-3 py-1.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-zinc-200 font-bold text-xs rounded-lg transition-all"
  >
  <Plus className="w-3.5 h-3.5" />
  <span>إضافة لاعب إضافي</span>
@@ -923,7 +923,7 @@ export const League1v1Page = () => {
  </div>
  </th>
  <th className="px-5 py-4 font-bold text-center min-w-[110px]">
- <div className="flex items-center justify-center gap-1 text-emerald-400">
+ <div className="flex items-center justify-center gap-1 text-zinc-300 font-black">
  <Goal className="w-3.5 h-3.5" />
  <span>أهداف (+1)</span>
  </div>
@@ -934,7 +934,7 @@ export const League1v1Page = () => {
  <span>مهارات (+1)</span>
  </div>
  </th>
- <th className="px-5 py-4 font-black text-center min-w-[120px] text-emerald-400">
+ <th className="px-5 py-4 font-black text-center min-w-[120px] text-zinc-300 font-black">
  المجموع (تلقائي)
  </th>
  <th className="px-5 py-4 font-bold text-center w-24">إجراءات</th>
@@ -981,7 +981,7 @@ export const League1v1Page = () => {
  min="0"
  value={p.goals || 0}
  onChange={(e) => handlePlayerChange(idx, 'goals', e.target.value)}
- className="w-20 bg-vsp-card border border-emerald-500/30 rounded-xl px-2.5 py-2 text-center text-emerald-300 font-black text-xs focus:border-emerald-400 focus:outline-none"
+ className="w-20 bg-vsp-card border border-vsp-border rounded-xl px-2.5 py-2 text-center text-white font-black text-xs focus:border-zinc-500 focus:outline-none"
  />
  </td>
 
@@ -998,10 +998,10 @@ export const League1v1Page = () => {
 
  {/* Auto Total Points Display */}
  <td className="px-5 py-3.5 text-center">
- <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl font-black text-sm">
+ <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-vsp-card border border-vsp-border text-white rounded-xl font-black text-sm">
  {isTop && <span></span>}
  <span>{total}</span>
- <span className="text-[10px] text-emerald-400/70 font-normal">نقطة</span>
+ <span className="text-[10px] text-zinc-400 font-normal">نقطة</span>
  </span>
  </td>
 
@@ -1099,7 +1099,7 @@ export const League1v1Page = () => {
         <td className="px-6 py-4 font-bold text-white">{item.name}</td>
         <td className="px-6 py-4 font-bold text-zinc-300">
          <span className="px-2.5 py-1 bg-vsp-card border border-vsp-border rounded-lg text-xs flex items-center gap-1 w-fit">
-          <MapPin className="w-3 h-3 text-emerald-400" />
+          <MapPin className="w-3 h-3 text-zinc-400" />
           {getGovArabicName(item.governorate)}
          </span>
         </td>
@@ -1195,9 +1195,9 @@ export const League1v1Page = () => {
  }
  }}
  disabled={processing}
- className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-lg font-bold text-xs transition-all"
+ className="flex items-center gap-1 px-3 py-1.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white rounded-lg font-bold text-xs transition-all"
  >
- <CheckCircle2 className="w-3.5 h-3.5" />
+ <CheckCircle2 className="w-3.5 h-3.5 text-vsp-accent" />
  <span>قبول</span>
  </button>
  <button
@@ -1240,13 +1240,13 @@ export const League1v1Page = () => {
  title="بدء بطولة 1vs1 جديدة "
  >
  <form onSubmit={handleConfirmStartTournament} className="space-y-4 text-right" dir="rtl">
- <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs leading-relaxed">
+ <div className="p-3.5 bg-vsp-card border border-vsp-border rounded-xl text-zinc-300 text-xs leading-relaxed">
  <strong>تنبيه:</strong> بدء بطولة جديدة سينشئ مسودة جديدة بشيت رصد فارغ بالعدد الذي تحدده بنفسك، ليتم تفريغ نقاط المباريات الورقية دفعة واحدة بعد انتهاء الساعتين.
  </div>
 
  <div>
  <label className="block text-xs font-bold text-zinc-300 mb-1.5 flex items-center gap-1.5">
-  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+  <MapPin className="w-3.5 h-3.5 text-zinc-400" />
   <span>المحافظة المستهدفة للبطولة</span>
  </label>
  <select
@@ -1320,7 +1320,7 @@ export const League1v1Page = () => {
  value={entryFeeInput}
  onChange={(e) => setEntryFeeInput(e.target.value)}
  placeholder="مثال: 50، 100، 150"
- className="w-full bg-vsp-card border border-emerald-500/40 rounded-xl px-4 py-2.5 text-emerald-400 font-black text-sm focus:border-emerald-500 focus:outline-none"
+ className="w-full bg-vsp-card border border-vsp-border rounded-xl px-4 py-2.5 text-white font-black text-sm focus:border-zinc-500 focus:outline-none"
  required
  />
  <span className="text-[11px] text-zinc-400 mt-1 block">
@@ -1355,7 +1355,7 @@ export const League1v1Page = () => {
  <button
  type="submit"
  disabled={processing}
- className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-lg transition-all"
+ className="flex items-center gap-2 px-5 py-2 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all"
  >
  {processing && <Loader2 className="w-4 h-4 animate-spin" />}
  <span>تأكيد وإنشاء البطولة </span>
@@ -1382,7 +1382,7 @@ export const League1v1Page = () => {
  <th className="px-4 py-3 font-bold text-center">تاكلينج</th>
  <th className="px-4 py-3 font-bold text-center">أهداف</th>
  <th className="px-4 py-3 font-bold text-center">مهارة</th>
- <th className="px-4 py-3 font-bold text-center text-emerald-400">المجموع</th>
+ <th className="px-4 py-3 font-bold text-center text-zinc-300 font-black">المجموع</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-vsp-border/50">
@@ -1393,9 +1393,9 @@ export const League1v1Page = () => {
  </td>
  <td className="px-4 py-3 font-bold text-white">{p.player_name}</td>
  <td className="px-4 py-3 text-center text-cyan-400 font-bold">{p.tackles}</td>
- <td className="px-4 py-3 text-center text-emerald-400 font-bold">{p.goals}</td>
+ <td className="px-4 py-3 text-center text-zinc-300 font-bold">{p.goals}</td>
  <td className="px-4 py-3 text-center text-purple-400 font-bold">{p.skills}</td>
- <td className="px-4 py-3 text-center font-black text-emerald-400">{p.total_points}</td>
+ <td className="px-4 py-3 text-center font-black text-zinc-300 font-black">{p.total_points}</td>
  </tr>
  ))}
  </tbody>

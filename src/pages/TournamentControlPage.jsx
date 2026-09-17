@@ -186,7 +186,7 @@ export const TournamentControlPage = () => {
         >
           <div className="space-y-4">
             <div className="p-3 bg-zinc-800/80 border border-zinc-700 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
               <div className="text-xs text-zinc-300 leading-relaxed">
                 <p className="font-bold text-white mb-1">
                   تنبيه أمني وتنظيمي:
@@ -463,7 +463,7 @@ export const TournamentControlPage = () => {
           onClick={() => setActiveTab('pending')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative ${
             activeTab === 'pending'
-              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+              ? 'bg-zinc-100 text-black shadow-md'
               : 'bg-vsp-surface hover:bg-vsp-card text-zinc-400 hover:text-white border border-vsp-border'
           }`}
         >
@@ -474,7 +474,7 @@ export const TournamentControlPage = () => {
               className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                 activeTab === 'pending'
                   ? 'bg-black/20 text-black'
-                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse'
+                  : 'bg-vsp-card text-zinc-300 border border-vsp-border'
               }`}
             >
               {pendingTournaments.length}
@@ -503,7 +503,7 @@ export const TournamentControlPage = () => {
               return (
                 <div
                   key={champ.id}
-                  className="bg-vsp-surface border border-zinc-700 hover:border-emerald-500/50 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between shadow-lg shadow-emerald-500/5"
+                  className="bg-vsp-surface border border-vsp-border hover:border-zinc-600 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between shadow-lg"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">

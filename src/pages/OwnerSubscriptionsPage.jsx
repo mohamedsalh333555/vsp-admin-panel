@@ -424,7 +424,7 @@ export const OwnerSubscriptionsPage = () => {
                             <div className="font-bold text-white flex items-center gap-1.5">
                               <span>{owner.name || '-'}</span>
                               {details.isPro && details.isActive && (
-                                <Zap className="w-3 h-3 text-emerald-400 fill-emerald-400" />
+                                <Zap className="w-3 h-3 text-vsp-accent fill-vsp-accent" />
                               )}
                             </div>
                             <div className="text-[11px] text-zinc-400 font-mono">

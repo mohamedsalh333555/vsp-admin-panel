@@ -18,7 +18,7 @@ export default {
           textPrimary: '#FAFAFA',
           textSecondary: '#A1A1AA',
           danger: '#EF4444',
-          warning: '#10B981',
+          warning: '#71717A',
           success: '#10B981',
         }
       },
