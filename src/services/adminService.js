@@ -99,19 +99,67 @@ class AdminService {
     try {
       const { data, error } = await this.client
         .from('bookings')
-        .select('id, created_at, start_time, end_time, total_price, payment_method, payment_status, status, deposit_paid, is_deposit_paid, cancellation_reason, refund_amount, refund_transaction_id, refunded_at, refund_payment_method, stadium_id, user_id, stadiums(name, governorate), users(name, phone, email)')
+        .select(`
+          id,
+          created_at,
+          start_time,
+          end_time,
+          total_price,
+          payment_method,
+          payment_status,
+          status,
+          deposit_paid,
+          is_deposit_paid,
+          cancellation_reason,
+          refund_amount,
+          refund_transaction_id,
+          refunded_at,
+          refund_payment_method,
+          stadium_id,
+          user_id,
+          created_by_user_id,
+          player_team_name,
+          stadiums(name, governorate),
+          player:users!bookings_created_by_user_id_fkey(name, phone, email)
+        `)
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) {
+        console.warn('Booking join warning, falling back to batch lookup:', error.message);
         const fallback = await this.client
           .from('bookings')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(limit);
-        return fallback.data || [];
+
+        const rawBookings = fallback.data || [];
+        if (rawBookings.length === 0) return [];
+
+        // Manually hydrate user profiles & stadium details so player name is NEVER missing
+        const userIds = [...new Set(rawBookings.map((b) => b.created_by_user_id || b.user_id).filter(Boolean))];
+        const stadiumIds = [...new Set(rawBookings.map((b) => b.stadium_id).filter(Boolean))];
+
+        const [usersMapRes, stadiumsMapRes] = await Promise.all([
+          userIds.length > 0 ? this.client.from('users').select('id, name, phone, email').in('id', userIds) : { data: [] },
+          stadiumIds.length > 0 ? this.client.from('stadiums').select('id, name, governorate').in('id', stadiumIds) : { data: [] },
+        ]);
+
+        const userMap = new Map((usersMapRes.data || []).map((u) => [u.id, u]));
+        const stadiumMap = new Map((stadiumsMapRes.data || []).map((s) => [s.id, s]));
+
+        return rawBookings.map((b) => ({
+          ...b,
+          users: userMap.get(b.created_by_user_id || b.user_id) || null,
+          player: userMap.get(b.created_by_user_id || b.user_id) || null,
+          stadiums: stadiumMap.get(b.stadium_id) || b.stadiums || null,
+        }));
       }
-      return data || [];
+
+      return (data || []).map((b) => ({
+        ...b,
+        users: b.player || b.users || null,
+      }));
     } catch (e) {
       console.error('Error fetching recent bookings:', e);
       return [];

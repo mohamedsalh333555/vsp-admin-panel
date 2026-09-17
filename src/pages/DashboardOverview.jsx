@@ -126,8 +126,8 @@ export const DashboardOverview = ({ onNavigate }) => {
       const q = searchTerm.toLowerCase().trim();
       const bookingId = (b.id || '').toLowerCase();
       const stadiumName = (b.stadiums?.name || b.stadium_name || '').toLowerCase();
-      const userName = (b.users?.name || b.customer_name || '').toLowerCase();
-      const userPhone = (b.users?.phone || b.customer_phone || '').toLowerCase();
+      const userName = (b.users?.name || b.player?.name || b.customer_name || b.player_team_name || '').toLowerCase();
+      const userPhone = (b.users?.phone || b.player?.phone || b.customer_phone || '').toLowerCase();
 
       return (
         bookingId.includes(q) ||
@@ -537,7 +537,17 @@ export const DashboardOverview = ({ onNavigate }) => {
               ) : (
                 filteredBookings.map((b) => {
                   const statusInfo = getStatusBadge(b.status);
-                  const playerName = b.users?.name || b.customer_name || t('user_player');
+                  const playerName =
+                    b.users?.name ||
+                    b.player?.name ||
+                    b.customer_name ||
+                    b.player_team_name ||
+                    (isAr ? 'لاعب مسجل' : 'Registered Player');
+                  const playerPhone =
+                    b.users?.phone ||
+                    b.player?.phone ||
+                    b.customer_phone ||
+                    '-';
 
                   return (
                     <tr
@@ -565,7 +575,7 @@ export const DashboardOverview = ({ onNavigate }) => {
                       <td className="px-6 py-4">
                         <span className="font-bold text-white block">{playerName}</span>
                         <span className="text-[10px] text-zinc-400 font-mono">
-                          {b.users?.phone || b.customer_phone || '-'}
+                          {playerPhone}
                         </span>
                       </td>
 
