@@ -2,19 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { adminService } from '../services/adminService';
 import {
-  LayoutDashboard,
-  FileCheck2,
+  Category,
+  ClipboardTick,
   Crown,
-  Users,
-  Trophy,
-  Swords,
-  CreditCard,
-  Flame,
-  Megaphone,
-  Settings,
-  X,
-  Shield,
-} from 'lucide-react';
+  Profile2User,
+  Judge,
+  Card,
+  Flash,
+  Cup,
+  Speaker,
+  Setting2,
+  CloseCircle,
+} from 'iconsax-react';
 
 export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobile }) => {
   const { t } = useLanguage();
@@ -42,11 +41,11 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
   }, []);
 
   const menuItems = [
-    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'dashboard', label: t('dashboard'), icon: Category },
     {
       id: 'owner_audits',
       label: t('owner_audits'),
-      icon: FileCheck2,
+      icon: ClipboardTick,
       badge: counts.pendingOwners > 0 ? counts.pendingOwners : null,
       badgeColor: 'bg-zinc-800 text-zinc-300 border border-zinc-700',
     },
@@ -58,41 +57,41 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
     {
       id: 'users',
       label: t('users'),
-      icon: Users,
+      icon: Profile2User,
     },
     {
       id: 'disputes',
       label: t('disputes'),
-      icon: Swords,
+      icon: Judge,
       badge: counts.disputes > 0 ? counts.disputes : null,
       badgeColor: 'bg-zinc-800 text-zinc-300 border border-zinc-700',
     },
     {
       id: 'payout_settlements',
       label: t('payout_settlements'),
-      icon: CreditCard,
+      icon: Card,
       badge: counts.payouts > 0 ? counts.payouts : null,
       badgeColor: 'bg-zinc-800 text-zinc-300 border border-zinc-700',
     },
     {
       id: 'league_1v1',
       label: t('league_1v1'),
-      icon: Flame,
+      icon: Flash,
     },
     {
       id: 'tournaments',
       label: t('tournaments'),
-      icon: Trophy,
+      icon: Cup,
     },
     {
       id: 'banners',
       label: t('banners'),
-      icon: Megaphone,
+      icon: Speaker,
     },
     {
       id: 'settings',
       label: t('settings'),
-      icon: Settings,
+      icon: Setting2,
     },
   ];
 
@@ -125,7 +124,7 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
               onClick={onCloseMobile}
               className="md:hidden p-1.5 bg-vsp-card border border-vsp-border rounded-lg text-vsp-textSecondary hover:text-white"
             >
-              <X className="w-4 h-4" />
+              <CloseCircle className="w-4 h-4" variant="Outline" />
             </button>
           )}
         </div>
@@ -151,6 +150,7 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
               >
                 <div className="flex items-center gap-2.5 truncate">
                   <Icon
+                    variant="Outline"
                     className={`w-4 h-4 shrink-0 ${isActive ? 'text-vsp-accent' : 'text-zinc-500'}`}
                   />
                   <span className="truncate">{item.label}</span>

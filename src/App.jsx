@@ -15,7 +15,7 @@ import { League1v1Page } from './pages/League1v1Page';
 import { TournamentControlPage } from './pages/TournamentControlPage';
 import { BannersManagementPage } from './pages/BannersManagementPage';
 import { CRMSettingsPage } from './pages/CRMSettingsPage';
-import { Clock, LogOut, Loader2 } from 'lucide-react';
+import { Clock, Logout, RotateRight } from 'iconsax-react';
 
 export default function App() {
   const { user, profile, loading, logout } = useAuth();
@@ -26,7 +26,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-vsp-bg flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-vsp-accent animate-spin" />
+        <RotateRight variant="Outline" className="w-10 h-10 text-vsp-accent animate-spin" />
       </div>
     );
   }
@@ -51,7 +51,7 @@ export default function App() {
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-8 w-full max-w-md text-center space-y-4 shadow-2xl glass-panel">
             <div className="w-16 h-16 bg-vsp-card border border-vsp-border rounded-2xl flex items-center justify-center mx-auto text-zinc-400">
-              <Clock className="w-8 h-8" />
+              <Clock variant="Outline" className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-white">{t('pending_approval')}</h2>
             <p className="text-xs text-vsp-textSecondary leading-relaxed">{t('pending_note')}</p>
@@ -59,7 +59,7 @@ export default function App() {
               onClick={logout}
               className="w-full py-3 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
             >
-              <LogOut className="w-4 h-4 text-vsp-accent" />
+              <Logout variant="Outline" className="w-4 h-4 text-vsp-accent" />
               <span>{t('logout')}</span>
             </button>
           </div>

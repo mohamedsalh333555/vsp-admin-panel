@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Globe, LogOut, ShieldCheck, Crown, Menu, Camera, User } from 'lucide-react';
+import { Global, Logout, ShieldTick, Crown, HambergerMenu, Camera } from 'iconsax-react';
 
 export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) => {
   const { t, toggleLanguage } = useLanguage();
@@ -27,12 +27,12 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
           className="md:hidden p-2 bg-vsp-card border border-vsp-border rounded-xl text-vsp-accent hover:bg-vsp-border transition-colors"
           aria-label="Toggle Navigation Menu"
         >
-          <Menu className="w-5 h-5" />
+          <HambergerMenu className="w-5 h-5" variant="Outline" />
         </button>
 
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-vsp-accent" />
+            <ShieldTick className="w-6 h-6 text-vsp-accent" variant="Outline" />
             <h1 className="text-lg md:text-xl font-bold text-white tracking-wide">{title}</h1>
           </div>
           {subtitle && <p className="text-xs text-vsp-textSecondary mt-0.5">{subtitle}</p>}
@@ -71,14 +71,14 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <Camera className="w-3.5 h-3.5 text-white" />
+                  <Camera className="w-3.5 h-3.5 text-white" variant="Outline" />
                 </div>
               </button>
             </div>
 
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <Crown className="w-3.5 h-3.5 text-vsp-accent fill-vsp-accent shrink-0" />
+                <Crown className="w-3.5 h-3.5 text-vsp-accent shrink-0" variant="Outline" />
                 <span className="font-bold text-white text-xs">{displayName}</span>
               </div>
             </div>
@@ -93,7 +93,7 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
           onClick={toggleLanguage}
           className="flex items-center gap-2 px-3 py-1.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white text-xs font-semibold rounded-lg transition-colors"
         >
-          <Globe className="w-4 h-4 text-vsp-accent" />
+          <Global className="w-4 h-4 text-vsp-accent" variant="Outline" />
           <span>{t('lang_button')}</span>
         </button>
 
@@ -101,7 +101,7 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
           onClick={logout}
           className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold rounded-lg transition-colors"
         >
-          <LogOut className="w-4 h-4" />
+          <Logout className="w-4 h-4" variant="Outline" />
           <span>{t('logout')}</span>
         </button>
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { TickCircle, Danger, InfoCircle, CloseCircle } from 'iconsax-react';
 
 export const Toast = ({ message, type = 'success', onClose, duration = 4000 }) => {
   useEffect(() => {
@@ -12,21 +12,21 @@ export const Toast = ({ message, type = 'success', onClose, duration = 4000 }) =
 
   const config = {
     success: {
-      icon: CheckCircle2,
-      border: 'border-emerald-500/40',
-      bg: 'bg-emerald-950/80 text-emerald-300',
-      iconColor: 'text-emerald-400',
+      icon: TickCircle,
+      border: 'border-vsp-accent/40',
+      bg: 'bg-zinc-900/90 text-zinc-100',
+      iconColor: 'text-vsp-accent',
     },
     error: {
-      icon: AlertCircle,
+      icon: Danger,
       border: 'border-red-500/40',
       bg: 'bg-red-950/80 text-red-300',
       iconColor: 'text-red-400',
     },
     info: {
-      icon: Info,
-      border: 'border-vsp-accent/40',
-      bg: 'bg-zinc-900/90 text-vsp-accent',
+      icon: InfoCircle,
+      border: 'border-zinc-700',
+      bg: 'bg-zinc-900/90 text-zinc-200',
       iconColor: 'text-vsp-accent',
     },
   };
@@ -39,14 +39,14 @@ export const Toast = ({ message, type = 'success', onClose, duration = 4000 }) =
       <div
         className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl ${current.bg} ${current.border}`}
       >
-        <Icon className={`w-5 h-5 shrink-0 ${current.iconColor}`} />
+        <Icon className={`w-5 h-5 shrink-0 ${current.iconColor}`} variant="Outline" />
         <span className="text-xs font-bold leading-tight">{message}</span>
         {onClose && (
           <button
             onClick={onClose}
             className="p-1 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
           >
-            <X className="w-3.5 h-3.5" />
+            <CloseCircle className="w-3.5 h-3.5" variant="Outline" />
           </button>
         )}
       </div>

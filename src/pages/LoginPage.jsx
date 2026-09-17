@@ -1,7 +1,7 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { Lock, Mail, ArrowRight, Globe } from 'lucide-react';
+import { Lock, Sms, ArrowRight, Global } from 'iconsax-react';
 
 export const LoginPage = () => {
   const { login } = useAuth();
@@ -36,7 +36,7 @@ export const LoginPage = () => {
           onClick={toggleLanguage}
           className="flex items-center gap-2 px-3 py-1.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-white text-xs font-semibold rounded-lg transition-colors"
         >
-          <Globe className="w-4 h-4 text-vsp-accent" />
+          <Global className="w-4 h-4 text-vsp-accent" variant="Outline" />
           <span>{t('lang_button')}</span>
         </button>
       </div>
@@ -66,7 +66,7 @@ export const LoginPage = () => {
               {t('email_label')}
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-vsp-textSecondary absolute right-3 top-3" />
+              <Sms className="w-4 h-4 text-vsp-textSecondary absolute right-3 top-3" variant="Outline" />
               <input
                 type="email"
                 required
@@ -83,7 +83,7 @@ export const LoginPage = () => {
               {t('password_label')}
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-vsp-textSecondary absolute right-3 top-3" />
+              <Lock className="w-4 h-4 text-vsp-textSecondary absolute right-3 top-3" variant="Outline" />
               <input
                 type="password"
                 required
@@ -105,7 +105,7 @@ export const LoginPage = () => {
             ) : (
               <>
                 <span>{t('btn_login')}</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" variant="Outline" />
               </>
             )}
           </button>

@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { AlertCircle } from 'lucide-react';
+import React from 'react';
+import { Danger } from 'iconsax-react';
 
 export const EmptyState = ({
   icon: Icon,
@@ -14,7 +14,7 @@ export const EmptyState = ({
 }) => {
   const effectiveSubtitle = subtitle || description;
   const effectiveActionText = actionText || actionLabel;
-  const EffectiveIcon = Icon || (isError ? AlertCircle : null);
+  const EffectiveIcon = Icon || (isError ? Danger : null);
 
   return (
     <div className={`flex flex-col items-center justify-center p-12 text-center bg-vsp-surface border rounded-2xl ${
@@ -26,7 +26,7 @@ export const EmptyState = ({
             ? 'bg-red-500/10 border-red-500/30 text-red-400'
             : 'bg-vsp-card border-vsp-border text-vsp-textSecondary'
         }`}>
-          <EffectiveIcon className={`w-8 h-8 ${isError ? 'text-red-400' : 'text-vsp-accent'}`} />
+          <EffectiveIcon className={`w-8 h-8 ${isError ? 'text-red-400' : 'text-vsp-accent'}`} variant="Outline" />
         </div>
       )}
       <h3 className="text-base font-bold text-white mb-1">{title}</h3>
@@ -44,7 +44,7 @@ export const EmptyState = ({
               : 'bg-vsp-accent hover:bg-vsp-accentHover text-black shadow-vsp-accent/20'
           }`}
         >
-          {ActionIcon && <ActionIcon className="w-4 h-4" />}
+          {ActionIcon && <ActionIcon className="w-4 h-4" variant="Outline" />}
           <span>{effectiveActionText}</span>
         </button>
       )}

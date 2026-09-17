@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { CloseCircle } from 'iconsax-react';
 
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }) => {
   useEffect(() => {
@@ -37,7 +37,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             onClick={onClose}
             className="p-1.5 rounded-lg text-vsp-textSecondary hover:text-white hover:bg-vsp-card border border-transparent hover:border-vsp-border transition-all"
           >
-            <X className="w-4 h-4" />
+            <CloseCircle className="w-4 h-4" variant="Outline" />
           </button>
         </div>
 

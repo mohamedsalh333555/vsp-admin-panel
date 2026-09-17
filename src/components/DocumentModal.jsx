@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
+import { CloseCircle, SearchZoomIn1, SearchZoomOut1, RotateRight } from 'iconsax-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export const DocumentModal = ({ title, url, onClose }) => {
@@ -19,25 +19,25 @@ export const DocumentModal = ({ title, url, onClose }) => {
               onClick={() => setZoom((z) => Math.min(z + 0.25, 3))}
               className="p-1.5 bg-vsp-card border border-vsp-border rounded-lg text-white hover:text-vsp-accent"
             >
-              <ZoomIn className="w-4 h-4" />
+              <SearchZoomIn1 className="w-4 h-4" variant="Outline" />
             </button>
             <button
               onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
               className="p-1.5 bg-vsp-card border border-vsp-border rounded-lg text-white hover:text-vsp-accent"
             >
-              <ZoomOut className="w-4 h-4" />
+              <SearchZoomOut1 className="w-4 h-4" variant="Outline" />
             </button>
             <button
               onClick={() => setRotation((r) => (r + 90) % 360)}
               className="p-1.5 bg-vsp-card border border-vsp-border rounded-lg text-white hover:text-vsp-accent"
             >
-              <RotateCw className="w-4 h-4" />
+              <RotateRight className="w-4 h-4" variant="Outline" />
             </button>
             <button
               onClick={onClose}
               className="p-1.5 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/30"
             >
-              <X className="w-4 h-4" />
+              <CloseCircle className="w-4 h-4" variant="Outline" />
             </button>
           </div>
         </div>

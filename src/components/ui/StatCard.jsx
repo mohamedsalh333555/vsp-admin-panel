@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendUp, TrendDown } from 'iconsax-react';
 
 export const StatCard = ({
   label,
@@ -22,7 +22,7 @@ export const StatCard = ({
         </span>
         {Icon && (
           <div className="w-9 h-9 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400 group-hover:text-vsp-accent group-hover:border-vsp-accent/20 transition-colors">
-            <Icon className="w-4 h-4" />
+            <Icon className="w-4 h-4" variant="Outline" />
           </div>
         )}
       </div>
@@ -35,14 +35,14 @@ export const StatCard = ({
           <div
             className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${
               Number(trend) >= 0
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                ? 'bg-zinc-800 text-vsp-accent border-vsp-accent/30'
                 : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
             }`}
           >
             {Number(trend) >= 0 ? (
-              <TrendingUp className="w-3 h-3 text-emerald-400" />
+              <TrendUp className="w-3 h-3 text-vsp-accent" variant="Outline" />
             ) : (
-              <TrendingDown className="w-3 h-3 text-rose-400" />
+              <TrendDown className="w-3 h-3 text-rose-400" variant="Outline" />
             )}
             <span>{Number(trend) >= 0 ? `+${trend}%` : `${trend}%`}</span>
           </div>

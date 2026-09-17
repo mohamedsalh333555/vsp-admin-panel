@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ExternalLink, Download } from 'lucide-react';
+import { CloseCircle, ExportCurve, DocumentDownload } from 'iconsax-react';
 import { useLanguage } from '../../context/LanguageContext';
 
 export const ImagePreviewModal = ({ isOpen, onClose, title, imageUrl, isPdf = false }) => {
@@ -29,14 +29,14 @@ export const ImagePreviewModal = ({ isOpen, onClose, title, imageUrl, isPdf = fa
               rel="noreferrer"
               className="p-1.5 rounded-lg text-vsp-textSecondary hover:text-white hover:bg-vsp-card border border-transparent hover:border-vsp-border transition-all flex items-center gap-1.5 text-xs font-semibold px-3"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ExportCurve className="w-3.5 h-3.5" variant="Outline" />
               <span>{t('open_in_new_tab')}</span>
             </a>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-vsp-textSecondary hover:text-white hover:bg-vsp-card border border-transparent hover:border-vsp-border transition-all"
             >
-              <X className="w-4 h-4" />
+              <CloseCircle className="w-4 h-4" variant="Outline" />
             </button>
           </div>
         </div>
