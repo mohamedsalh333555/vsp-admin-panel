@@ -78,6 +78,7 @@ class AdminService {
         pendingOwners: pendingOwnersCount,
         disputesCount: disputesRes.count || 0,
         pendingPayouts: pendingPayoutsAmount,
+        totalEscrowHeld: financialOverview?.kpis?.totalEscrowHeld ?? 0,
       };
     } catch (e) {
       console.error('Error in fetchDashboardStats:', e);
@@ -1434,7 +1435,10 @@ class AdminService {
         );
 
         let grossVolume = 0;
-        let onlineCollected = 0;
+        let onlineCollected = 0; // Total online funds held in gateway (620 EGP)
+        let completedOnlineCollected = 0; // Finished matches ready for disbursement (520 EGP)
+        let escrowOnlineHeld = 0; // Future matches held in escrow (100 EGP)
+        let upcomingBookings = [];
         let platformCommission = 0;
 
         ownerBookings.forEach((b) => {
@@ -1454,6 +1458,18 @@ class AdminService {
 
           if (isOnline) {
             onlineCollected += collected;
+            if (b.status === 'completed') {
+              completedOnlineCollected += collected;
+            } else if (b.status === 'confirmed') {
+              escrowOnlineHeld += collected;
+              upcomingBookings.push({
+                id: b.id,
+                amount: collected,
+                startTime: b.start_time,
+                stadiumName: b.stadium_name || 'ملعب',
+              });
+            }
+
             // Server-recorded vsp_commission if present, or 2% pure platform fee on online volume
             const serverFee = Number(b.vsp_commission || 0);
             const fee = serverFee > 0 ? serverFee : Math.round(collected * 0.02 * 100) / 100;
@@ -1473,8 +1489,9 @@ class AdminService {
           ownerPayouts.reduce((sum, s) => sum + Number(s.amount || 0), 0) +
           ownerPaidTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        // Net Payable to Owner: 100% of collected stadium booking funds minus already settled payouts
-        const netBalance = Math.max(0, Math.round((onlineCollected - totalPaidOut) * 100) / 100);
+        // Net Payable to Owner right now: ONLY completed online bookings minus already settled payouts (Matches App 520 EGP!)
+        const netBalance = Math.max(0, Math.round((completedOnlineCollected - totalPaidOut) * 100) / 100);
+        const escrowHeld = Math.round(escrowOnlineHeld * 100) / 100;
 
         let payoutMethod = null;
         let payoutDestination = null;
@@ -1498,9 +1515,13 @@ class AdminService {
           governorate: owner.governorate || 'غير محدد',
           stadiumCount: ownerStadiums.length,
           stadiumNames: ownerStadiums.map((s) => s.name).join(', ') || 'ملعب رئيسي',
-          completedBookingsCount: ownerBookings.length,
+          completedBookingsCount: ownerBookings.filter((b) => b.status === 'completed').length,
+          totalBookingsCount: ownerBookings.length,
           grossVolume,
           onlineVolume: onlineCollected,
+          completedOnlineCollected,
+          escrowHeld,
+          upcomingBookings,
           platformCommission,
           totalPaidOut,
           netBalance,
@@ -1520,6 +1541,7 @@ class AdminService {
       const totalPendingOwnerDues = ownerMatrix
         .filter((o) => o.netBalance > 0)
         .reduce((sum, o) => sum + o.netBalance, 0);
+      const totalEscrowHeld = ownerMatrix.reduce((sum, o) => sum + (o.escrowHeld || 0), 0);
       const totalSettledPayouts = ownerMatrix.reduce((sum, o) => sum + o.totalPaidOut, 0);
 
       return {
@@ -1531,6 +1553,7 @@ class AdminService {
           totalOnlineCollected,
           totalPlatformRevenue,
           totalPendingOwnerDues,
+          totalEscrowHeld,
           totalSettledPayouts,
         },
       };

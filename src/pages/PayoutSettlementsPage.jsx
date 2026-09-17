@@ -41,6 +41,7 @@ export const PayoutSettlementsPage = () => {
       totalOnlineCollected: 0,
       totalPlatformRevenue: 0,
       totalPendingOwnerDues: 0,
+      totalEscrowHeld: 0,
       totalSettledPayouts: 0,
     },
   });
@@ -211,18 +212,12 @@ export const PayoutSettlementsPage = () => {
       </div>
 
       {/* Financial Executive KPI Matrix */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           label={t('kpi_online_collected')}
           value={`${Number(financialData.kpis.totalOnlineCollected || 0).toLocaleString()} ${t('currency')}`}
           icon={Wallet2}
           subtext={t('kpi_online_subtext')}
-        />
-        <StatCard
-          label={t('kpi_platform_commission')}
-          value={`${Number(financialData.kpis.totalPlatformRevenue || 0).toLocaleString()} ${t('currency')}`}
-          icon={DollarCircle}
-          subtext={t('kpi_platform_subtext')}
         />
         <StatCard
           label={t('kpi_pending_dues')}
@@ -231,10 +226,22 @@ export const PayoutSettlementsPage = () => {
           subtext={t('kpi_pending_subtext')}
         />
         <StatCard
+          label={t('kpi_escrow_held')}
+          value={`${Number(financialData.kpis.totalEscrowHeld || 0).toLocaleString()} ${t('currency')}`}
+          icon={Clock}
+          subtext={t('kpi_escrow_subtext')}
+        />
+        <StatCard
           label={t('kpi_total_settled')}
           value={`${Number(financialData.kpis.totalSettledPayouts || 0).toLocaleString()} ${t('currency')}`}
           icon={TickCircle}
           subtext={t('kpi_settled_subtext')}
+        />
+        <StatCard
+          label={t('kpi_platform_commission')}
+          value={`${Number(financialData.kpis.totalPlatformRevenue || 0).toLocaleString()} ${t('currency')}`}
+          icon={DollarCircle}
+          subtext={t('kpi_platform_subtext')}
         />
       </div>
 
@@ -404,6 +411,20 @@ export const PayoutSettlementsPage = () => {
                               </Badge>
                             )}
                           </div>
+                          {owner.escrowHeld > 0 && (
+                            <div
+                              className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg w-fit"
+                              title={t('kpi_escrow_subtext')}
+                            >
+                              <Clock className="w-3 h-3 text-amber-400 shrink-0" variant="Outline" />
+                              <span>{Number(owner.escrowHeld).toLocaleString()} {t('currency')} {t('upcoming_escrow_note')}</span>
+                              {owner.upcomingBookings && owner.upcomingBookings.length > 0 && (
+                                <span className="text-[10px] text-amber-300/80 font-sans">
+                                  ({new Date(owner.upcomingBookings[0].startTime).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' })})
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         <td className="px-6 py-4 text-center">
@@ -469,6 +490,13 @@ export const PayoutSettlementsPage = () => {
                       <td className="px-6 py-4 text-vsp-textSecondary">
                         {tx.payout_settlement_id ? (
                           <span className="text-vsp-accent font-semibold">{t('settled')}</span>
+                        ) : tx.status === 'confirmed' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md font-medium">
+                            <Clock className="w-3 h-3 shrink-0" variant="Outline" />
+                            <span>{t('upcoming_escrow_note')}</span>
+                          </span>
+                        ) : tx.status === 'completed' ? (
+                          <span className="text-emerald-400 font-semibold">{isRTL ? 'مكتمل (جاهز للصرف)' : 'Completed (Ready)'}</span>
                         ) : (
                           <span className="text-zinc-500 font-semibold">{t('pending')}</span>
                         )}
@@ -546,7 +574,7 @@ export const PayoutSettlementsPage = () => {
       >
         {selectedOwner && (
           <form onSubmit={handleExecuteSettlement} className="space-y-4">
-            <div className="p-4 bg-vsp-card border border-vsp-border rounded-xl">
+            <div className="p-4 bg-vsp-card border border-vsp-border rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs text-vsp-textSecondary">{t('owner_statement_col')}:</div>
@@ -560,6 +588,22 @@ export const PayoutSettlementsPage = () => {
                   </div>
                 </div>
               </div>
+
+              {selectedOwner.escrowHeld > 0 && (
+                <div className="pt-2 border-t border-vsp-border/70 flex items-start gap-2.5 text-xs text-amber-400 bg-amber-500/10 -mx-4 -mb-4 p-3 rounded-b-xl">
+                  <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" variant="Outline" />
+                  <div className="space-y-0.5">
+                    <div className="font-bold">
+                      {t('kpi_escrow_held')}: {Number(selectedOwner.escrowHeld).toLocaleString()} {t('currency')}
+                    </div>
+                    <p className="text-[11px] text-zinc-300 leading-relaxed">
+                      {isRTL
+                        ? 'هذا المبلغ محتجز كأمانة لحجز قادم ولم يُحتسب ضمن الرصيد القابل للصرف أعلاه. سيتم تحريره تلقائياً فور انتهاء موعد المباراة.'
+                        : 'This amount is held in escrow for an upcoming booking and is excluded from the withdrawable balance above. It will unlock automatically once the match is completed.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

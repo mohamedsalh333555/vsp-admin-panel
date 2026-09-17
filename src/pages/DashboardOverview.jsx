@@ -49,6 +49,7 @@ export const DashboardOverview = ({ onNavigate }) => {
     pendingOwners: 0,
     disputesCount: 0,
     pendingPayouts: 0,
+    totalEscrowHeld: 0,
   });
 
   const [recentBookings, setRecentBookings] = useState([]);
@@ -363,6 +364,11 @@ export const DashboardOverview = ({ onNavigate }) => {
               <span className="text-sm font-black text-white font-mono mt-0.5 block">
                 {stats.pendingPayouts.toLocaleString()} {t('currency')}
               </span>
+              {stats.totalEscrowHeld > 0 && (
+                <span className="text-[10px] text-amber-400/90 font-mono block mt-0.5">
+                  (+ {stats.totalEscrowHeld.toLocaleString()} {isAr ? 'أمانات' : 'escrow'})
+                </span>
+              )}
             </div>
             <ExportSquare className="w-4 h-4 text-zinc-500 group-hover:text-vsp-accent transition-colors" variant="Outline" />
           </button>
