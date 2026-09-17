@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../services/adminService';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../context/LanguageContext';
@@ -263,7 +263,7 @@ export const DashboardOverview = ({ onNavigate }) => {
       case 'disputed':
         return { text: isAr ? 'نزاع مفتوح' : 'Disputed', dot: 'bg-rose-400 animate-pulse' };
       default:
-        return { text: isAr ? 'قيد المراجعة' : 'Pending', dot: 'bg-amber-400' };
+        return { text: isAr ? 'قيد المراجعة' : 'Pending', dot: 'bg-zinc-400' };
     }
   };
 
@@ -684,7 +684,7 @@ export const DashboardOverview = ({ onNavigate }) => {
                   onClick={() => setEditForm({ ...editForm, status: 'pending' })}
                   className={`py-2 rounded-xl text-xs font-bold transition-all border ${
                     editForm.status === 'pending'
-                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                      ? 'bg-zinc-800 text-zinc-300 border-zinc-700'
                       : 'bg-vsp-card text-zinc-400 border-vsp-border hover:text-white'
                   }`}
                 >

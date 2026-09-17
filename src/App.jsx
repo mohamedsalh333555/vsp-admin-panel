@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useLanguage } from './context/LanguageContext';
 import { AdminHeader } from './components/AdminHeader';
@@ -50,7 +50,7 @@ export default function App() {
         <NetworkBanner />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-8 w-full max-w-md text-center space-y-4 shadow-2xl glass-panel">
-            <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+            <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto text-emerald-400">
               <Clock className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-white">{t('pending_approval')}</h2>

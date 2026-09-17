@@ -78,12 +78,12 @@ export const AdminHeader = ({ title, subtitle, action, onToggleMobileSidebar }) 
 
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <Crown className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span className="font-bold text-white text-xs">{displayName}</span>
               </div>
             </div>
 
-            <span className="bg-amber-400/10 text-amber-400 border border-amber-400/20 px-2.5 py-0.5 rounded-md text-[11px] font-black tracking-wider">
+            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-md text-[11px] font-black tracking-wider">
               {profile?.position || (profile?.isCoFounder ? 'Co-Founder' : 'Admin')}
             </span>
           </div>

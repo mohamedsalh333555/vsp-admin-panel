@@ -353,7 +353,7 @@ export const OwnerSubscriptionsPage = () => {
             </span>
             <h3 className="text-xl font-black text-white mt-0.5">{expiredCount}</h3>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-amber-400">
+          <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
             <AlertTriangle className="w-4 h-4" />
           </div>
         </button>
@@ -424,7 +424,7 @@ export const OwnerSubscriptionsPage = () => {
                             <div className="font-bold text-white flex items-center gap-1.5">
                               <span>{owner.name || '-'}</span>
                               {details.isPro && details.isActive && (
-                                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                <Zap className="w-3 h-3 text-emerald-400 fill-emerald-400" />
                               )}
                             </div>
                             <div className="text-[11px] text-zinc-400 font-mono">
@@ -457,7 +457,7 @@ export const OwnerSubscriptionsPage = () => {
                               details.isExpired
                                 ? 'text-rose-400 font-bold'
                                 : details.diffDays <= 7
-                                ? 'text-amber-400 font-bold'
+                                ? 'text-zinc-300 font-bold'
                                 : 'text-zinc-400'
                             }`}
                           >
@@ -472,7 +472,7 @@ export const OwnerSubscriptionsPage = () => {
                             <span
                               className={`font-mono font-bold ${
                                 hasOverCapacity
-                                  ? 'text-amber-400'
+                                  ? 'text-rose-400'
                                   : details.isUnlimited
                                   ? 'text-emerald-400'
                                   : stadiumCount === 0
@@ -494,8 +494,8 @@ export const OwnerSubscriptionsPage = () => {
                             </span>
                           </div>
                           {stadiumCount === 0 ? (
-                            <span className="text-[10px] text-amber-400/90 flex items-center gap-1 font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                            <span className="text-[10px] text-zinc-400 flex items-center gap-1 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 inline-block" />
                               {isAr ? 'لم يُدرج الملعب بعد' : 'No stadium listed yet'}
                             </span>
                           ) : (
@@ -690,9 +690,9 @@ export const OwnerSubscriptionsPage = () => {
       >
         {downgradeOwner && (
           <div className="space-y-4">
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-200 leading-relaxed">
+            <div className="p-4 bg-zinc-800/80 border border-zinc-700 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300 leading-relaxed">
                 {t('confirm_downgrade_msg', { name: downgradeOwner.name })}
               </div>
             </div>

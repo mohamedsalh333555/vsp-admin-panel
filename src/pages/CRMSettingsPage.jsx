@@ -225,7 +225,7 @@ export const CRMSettingsPage = () => {
               <div className="flex items-center gap-2">
                 <span
                   className={`w-3 h-3 rounded-full ${
-                    maintenance ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'
+                    maintenance ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'
                   }`}
                 />
                 <span className="text-xs font-bold text-white">

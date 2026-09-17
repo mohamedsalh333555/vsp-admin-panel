@@ -356,7 +356,7 @@ export const PayoutSettlementsPage = () => {
                               </span>
                             ) : (
                               <span className="text-zinc-500 italic flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3 text-amber-400" />
+                                <AlertCircle className="w-3 h-3 text-zinc-500" />
                                 <span>{t('no_destination_registered')}</span>
                               </span>
                             )}

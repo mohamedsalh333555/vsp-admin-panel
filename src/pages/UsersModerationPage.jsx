@@ -170,7 +170,7 @@ const COFOUNDER_EMAILS = [
     if (isCoFounder) {
       return (
         <Badge variant="accent" size="sm">
-          <Crown className="w-3 h-3 text-amber-400 inline fill-amber-400" />
+          <Crown className="w-3 h-3 text-emerald-400 inline fill-emerald-400" />
           <span>{t('cofounder')}</span>
         </Badge>
       );
@@ -412,7 +412,7 @@ const COFOUNDER_EMAILS = [
                               (user.no_show_count || 0) >= 3
                                 ? 'bg-red-500/20 text-red-400 border border-red-500/40'
                                 : (user.no_show_count || 0) > 0
-                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                                ? 'bg-zinc-800 text-zinc-300 border border-zinc-700'
                                 : 'bg-vsp-card text-zinc-400 border border-vsp-border'
                             }`}
                           >
@@ -446,7 +446,7 @@ const COFOUNDER_EMAILS = [
                       <td className="px-6 py-4 text-center">
                         {isCoFounder ? (
                           <div className="flex items-center justify-center">
-                            <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-xs rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                            <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs rounded-xl inline-flex items-center gap-1.5 shadow-sm">
                               <ShieldCheck className="w-3.5 h-3.5" />
                               <span>{t('protected_cofounder_account')}</span>
                             </span>
