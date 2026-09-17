@@ -1440,20 +1440,21 @@ class AdminService {
         ownerBookings.forEach((b) => {
           const price = Number(b.total_price || 0);
           const deposit = Number(b.deposit_paid || 0);
-          const isCash = !b.payment_method || b.payment_method.toLowerCase() === 'cash';
-          const isOnline =
-            b.is_deposit_paid ||
-            deposit > 0 ||
-            Boolean(b.paymob_transaction_id) ||
-            Boolean(b.payment_transaction_id) ||
-            (!isCash && (b.payment_status === 'paid' || b.is_paid));
-          const collected = deposit > 0 ? deposit : price;
+          const method = (b.payment_method || '').toLowerCase().trim();
+          const isCash = method === 'cash' || method.includes('كاش');
+          const hasOnlineTxn = Boolean(b.paymob_transaction_id) || Boolean(b.payment_transaction_id);
+          const isOnlineMethod = method === 'online' || method === 'paymob' || method === 'card' || method === 'wallet';
+
+          // Strictly mirror Flutter mobile app: cash bookings are collected by owner on-site
+          // Only true online methods or Paymob transaction IDs represent digital funds held by platform
+          const isOnline = !isCash && (isOnlineMethod || hasOnlineTxn || b.payment_status === 'paid' || b.is_paid);
+          const collected = (deposit > 0 && deposit < price) ? deposit : price;
 
           grossVolume += price;
 
           if (isOnline) {
             onlineCollected += collected;
-            // Check if server-recorded vsp_commission exists, otherwise apply pure 2% platform fee
+            // Server-recorded vsp_commission if present, or 2% pure platform fee on online volume
             const serverFee = Number(b.vsp_commission || 0);
             const fee = serverFee > 0 ? serverFee : Math.round(collected * 0.02 * 100) / 100;
             platformCommission += fee;
