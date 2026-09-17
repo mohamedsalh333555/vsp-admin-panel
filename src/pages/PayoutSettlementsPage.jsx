@@ -133,7 +133,6 @@ export const PayoutSettlementsPage = () => {
       t('governorate'),
       t('gross_volume_col'),
       t('online_collected_col'),
-      t('platform_fee_col'),
       t('settled_payouts_col'),
       t('net_withdrawable_col'),
     ];
@@ -143,7 +142,6 @@ export const PayoutSettlementsPage = () => {
       `"${o.governorate}"`,
       o.grossVolume,
       o.onlineVolume,
-      o.platformCommission,
       o.totalPaidOut,
       o.netBalance,
     ]);
@@ -316,7 +314,6 @@ export const PayoutSettlementsPage = () => {
                     <th className="px-6 py-4 font-bold">{t('transfer_method')}</th>
                     <th className="px-6 py-4 font-bold">{t('gross_volume_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('online_collected_col')}</th>
-                    <th className="px-6 py-4 font-bold">{t('platform_fee_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('settled_payouts_col')}</th>
                     <th className="px-6 py-4 font-bold">{t('net_withdrawable_col')}</th>
                     <th className="px-6 py-4 font-bold text-center">{t('actions')}</th>
@@ -375,12 +372,6 @@ export const PayoutSettlementsPage = () => {
                         <td className="px-6 py-4">
                           <span className="font-bold text-vsp-accent font-mono">
                             {Number(owner.onlineVolume || 0).toLocaleString()} {t('currency')}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-zinc-300 font-mono">
-                            {Number(owner.platformCommission || 0).toLocaleString()} {t('currency')}
                           </span>
                         </td>
 
