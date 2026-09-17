@@ -7,19 +7,19 @@ import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
   Crown,
-  Search,
-  RefreshCw,
+  SearchNormal1,
+  Refresh2,
   Clock,
-  Sparkles,
-  Building2,
+  MagicStar,
+  Building,
   Calendar,
-  Phone,
-  CheckCircle2,
-  Loader2,
-  Zap,
-  AlertTriangle,
-  RotateCcw,
-} from 'lucide-react';
+  Call,
+  TickCircle,
+  RotateRight,
+  Flash,
+  Warning2,
+  RotateLeft,
+} from 'iconsax-react';
 
 export const OwnerSubscriptionsPage = () => {
   const { t, lang, isRTL } = useLanguage();
@@ -261,7 +261,7 @@ export const OwnerSubscriptionsPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
-            <Crown className="w-6 h-6 text-zinc-300" />
+            <Crown className="w-6 h-6 text-zinc-300" variant="Outline" />
             <span>{t('owner_subscriptions_title')}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-0.5">
@@ -275,7 +275,7 @@ export const OwnerSubscriptionsPage = () => {
             className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white rounded-xl transition-all"
             title={t('refresh_data')}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
           </button>
         </div>
       </div>
@@ -297,7 +297,7 @@ export const OwnerSubscriptionsPage = () => {
             <h3 className="text-xl font-black text-white mt-0.5">{owners.length}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-300">
-            <Building2 className="w-4 h-4" />
+            <Building className="w-4 h-4" variant="Outline" />
           </div>
         </button>
 
@@ -315,8 +315,8 @@ export const OwnerSubscriptionsPage = () => {
             </span>
             <h3 className="text-xl font-black text-white mt-0.5">{activeProCount}</h3>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-emerald-400">
-            <Zap className="w-4 h-4" />
+          <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-vsp-accent">
+            <Flash className="w-4 h-4" variant="Outline" />
           </div>
         </button>
 
@@ -335,7 +335,7 @@ export const OwnerSubscriptionsPage = () => {
             <h3 className="text-xl font-black text-white mt-0.5">{activeTrialCount}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-sky-400">
-            <Clock className="w-4 h-4" />
+            <Clock className="w-4 h-4" variant="Outline" />
           </div>
         </button>
 
@@ -354,14 +354,14 @@ export const OwnerSubscriptionsPage = () => {
             <h3 className="text-xl font-black text-white mt-0.5">{expiredCount}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
-            <AlertTriangle className="w-4 h-4" />
+            <Warning2 className="w-4 h-4" variant="Outline" />
           </div>
         </button>
       </div>
 
       {/* Search Input */}
       <div className="relative w-full">
-        <Search className={`w-4 h-4 text-zinc-500 absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3.5' : 'left-3.5'}`} />
+        <SearchNormal1 className={`w-4 h-4 text-zinc-500 absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3.5' : 'left-3.5'}`} variant="Outline" />
         <input
           type="text"
           value={search}
@@ -377,7 +377,7 @@ export const OwnerSubscriptionsPage = () => {
       <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+            <RotateRight className="w-8 h-8 text-zinc-400 animate-spin" variant="Outline" />
           </div>
         ) : filteredList.length === 0 ? (
           <EmptyState
@@ -408,7 +408,7 @@ export const OwnerSubscriptionsPage = () => {
                     <tr key={owner.id} className="hover:bg-vsp-card/30 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center font-bold text-emerald-400 shrink-0 overflow-hidden">
+                          <div className="w-9 h-9 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center font-bold text-vsp-accent shrink-0 overflow-hidden">
                             {owner.profile_image_url ? (
                               <img
                                 src={owner.profile_image_url}
@@ -424,7 +424,7 @@ export const OwnerSubscriptionsPage = () => {
                             <div className="font-bold text-white flex items-center gap-1.5">
                               <span>{owner.name || '-'}</span>
                               {details.isPro && details.isActive && (
-                                <Zap className="w-3 h-3 text-vsp-accent fill-vsp-accent" />
+                                <Flash className="w-3 h-3 text-vsp-accent" variant="Outline" />
                               )}
                             </div>
                             <div className="text-[11px] text-zinc-400 font-mono">
@@ -474,7 +474,7 @@ export const OwnerSubscriptionsPage = () => {
                                 hasOverCapacity
                                   ? 'text-rose-400'
                                   : details.isUnlimited
-                                  ? 'text-emerald-400'
+                                  ? 'text-vsp-accent'
                                   : stadiumCount === 0
                                   ? 'text-zinc-500'
                                   : 'text-zinc-200'
@@ -486,7 +486,7 @@ export const OwnerSubscriptionsPage = () => {
                             <span
                               className={`text-[11px] ${
                                 details.isUnlimited
-                                  ? 'text-emerald-400 font-bold'
+                                  ? 'text-vsp-accent font-bold'
                                   : 'text-zinc-400'
                               }`}
                             >
@@ -500,7 +500,7 @@ export const OwnerSubscriptionsPage = () => {
                             </span>
                           ) : (
                             owner.stadiumNames && owner.stadiumNames.length > 0 && (
-                              <span className="text-[10px] text-emerald-400/80 truncate max-w-[140px]">
+                              <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">
                                 {owner.stadiumNames.join(', ')}
                               </span>
                             )
@@ -519,7 +519,7 @@ export const OwnerSubscriptionsPage = () => {
                             disabled={isProcessing}
                             className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 hover:border-zinc-500 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
                           >
-                            <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+                            <MagicStar className="w-3.5 h-3.5 text-zinc-300" variant="Outline" />
                             <span>
                               {details.isPro && details.isActive
                                 ? t('extend_pro_btn')
@@ -534,7 +534,7 @@ export const OwnerSubscriptionsPage = () => {
                               title={t('downgrade_pro_btn')}
                               className="p-1.5 bg-vsp-card hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 border border-vsp-border hover:border-rose-500/40 rounded-xl transition-all disabled:opacity-50"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
+                              <RotateLeft className="w-3.5 h-3.5" variant="Outline" />
                             </button>
                           )}
                         </div>
@@ -579,7 +579,7 @@ export const OwnerSubscriptionsPage = () => {
               {/* Dynamic Calculation Notice */}
               <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs space-y-1">
                 <div className="flex items-center gap-1.5 font-bold text-zinc-200">
-                  <Calendar className="w-4 h-4 text-emerald-400" />
+                  <Calendar className="w-4 h-4 text-vsp-accent" variant="Outline" />
                   <span>
                     {isExtending
                       ? t('cumulative_notice', {
@@ -590,7 +590,7 @@ export const OwnerSubscriptionsPage = () => {
                       : t('new_activation_notice', { days: proDays })}
                   </span>
                 </div>
-                <div className="text-[11px] text-emerald-400 font-medium">
+                <div className="text-[11px] text-vsp-accent font-medium">
                   {t('expiry_col')}: {modalCalculatedExpiryDate}
                 </div>
               </div>
@@ -669,9 +669,9 @@ export const OwnerSubscriptionsPage = () => {
                   className="flex-1 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   {processingId === selectedOwner.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                   ) : (
-                    <CheckCircle2 className="w-4 h-4" />
+                    <TickCircle className="w-4 h-4" variant="Outline" />
                   )}
                   <span>{t('confirm_activate_plan')}</span>
                 </button>
@@ -691,7 +691,7 @@ export const OwnerSubscriptionsPage = () => {
         {downgradeOwner && (
           <div className="space-y-4">
             <div className="p-4 bg-zinc-800/80 border border-zinc-700 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
+              <Warning2 className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" variant="Outline" />
               <div className="text-xs text-zinc-300 leading-relaxed">
                 {t('confirm_downgrade_msg', { name: downgradeOwner.name })}
               </div>
@@ -712,9 +712,9 @@ export const OwnerSubscriptionsPage = () => {
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {processingId === downgradeOwner.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                 ) : (
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateLeft className="w-4 h-4" variant="Outline" />
                 )}
                 <span>{t('confirm_downgrade_btn')}</span>
               </button>

@@ -6,16 +6,16 @@ import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
-  Swords,
-  RefreshCw,
-  CheckCircle2,
-  AlertTriangle,
-  Loader2,
-  Building2,
+  Flash,
+  Refresh2,
+  TickCircle,
+  Warning2,
+  RotateRight,
+  Building,
   Calendar,
   User,
-  Scale,
-} from 'lucide-react';
+  Judge,
+} from 'iconsax-react';
 
 export const DisputesPage = () => {
   const { t } = useLanguage();
@@ -104,7 +104,7 @@ export const DisputesPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
-            <Swords className="w-6 h-6 text-zinc-400" />
+            <Judge className="w-6 h-6 text-zinc-400" variant="Outline" />
             <span>{t('disputes_title')}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-0.5">
@@ -117,18 +117,18 @@ export const DisputesPage = () => {
           disabled={loading}
           className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-zinc-400 hover:text-white rounded-xl transition-all self-end sm:self-auto disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
         </button>
       </div>
 
       {/* Content */}
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+          <RotateRight className="w-8 h-8 text-zinc-400 animate-spin" variant="Outline" />
         </div>
       ) : disputes.length === 0 ? (
         <EmptyState
-          icon={CheckCircle2}
+          icon={TickCircle}
           title={t('no_disputes_title')}
           subtitle={t('no_disputes_sub')}
         />
@@ -145,7 +145,7 @@ export const DisputesPage = () => {
               >
                 <div className="flex items-center justify-between">
                   <Badge variant="warning" size="sm">
-                    <AlertTriangle className="w-3 h-3" />
+                    <Warning2 className="w-3 h-3" variant="Outline" />
                     <span>{t('pending')}</span>
                   </Badge>
                   <span className="text-[11px] font-mono text-zinc-500">
@@ -157,7 +157,7 @@ export const DisputesPage = () => {
                 <div className="bg-vsp-card border border-vsp-border rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-white flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-zinc-400" />
+                      <User className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                       <span>{d.host_name || d.customer_name || t('home_team')}</span>
                     </span>
                     <span className="text-xs font-black text-white">
@@ -173,7 +173,7 @@ export const DisputesPage = () => {
 
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-white flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-zinc-400" />
+                      <User className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                       <span>{d.away_team_name || d.away_captain_name || t('away_team')}</span>
                     </span>
                     <span className="text-xs font-black text-white">
@@ -191,11 +191,11 @@ export const DisputesPage = () => {
                 {/* Booking details */}
                 <div className="flex items-center justify-between text-[11px] text-vsp-textSecondary pt-1">
                   <div className="flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5 text-zinc-400" />
+                    <Building className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                     <span>{d.stadium_name || t('stadium')}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
+                    <Calendar className="w-3.5 h-3.5" variant="Outline" />
                     <span>{d.start_time ? new Date(d.start_time).toLocaleDateString(t('lang_button') === 'English' ? 'ar-EG' : 'en-US') : '-'}</span>
                   </div>
                 </div>
@@ -205,7 +205,7 @@ export const DisputesPage = () => {
                   onClick={() => openResolutionModal(d)}
                   className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs rounded-xl border border-zinc-700 hover:border-zinc-500 flex items-center justify-center gap-2 transition-all shadow-sm"
                 >
-                  <Scale className="w-4 h-4" />
+                  <Judge className="w-4 h-4" variant="Outline" />
                   <span>{t('resolve_btn')}</span>
                 </button>
               </div>
@@ -310,7 +310,7 @@ export const DisputesPage = () => {
                 disabled={resolving}
                 className="px-5 py-2 bg-zinc-100 hover:bg-white text-black rounded-xl text-xs font-extrabold shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
-                {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4" />}
+                {resolving ? <RotateRight className="w-4 h-4 animate-spin" variant="Outline" /> : <Judge className="w-4 h-4" variant="Outline" />}
                 <span>{t('confirm')}</span>
               </button>
             </div>

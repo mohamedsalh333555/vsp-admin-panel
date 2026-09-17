@@ -7,21 +7,21 @@ import { Toast } from '../components/ui/Toast';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
-  CheckCircle2,
-  XCircle,
-  PlusCircle,
-  Building2,
-  Phone,
-  Mail,
-  MapPin,
-  FileText,
-  FileCheck,
-  Loader2,
+  TickCircle,
+  CloseCircle,
+  AddCircle,
+  Building,
+  Call,
+  Sms,
+  Location,
+  DocumentText,
+  ClipboardTick,
+  RotateRight,
   Eye,
-  RefreshCw,
+  Refresh2,
   Clock,
-  ShieldCheck,
-} from 'lucide-react';
+  ShieldTick,
+} from 'iconsax-react';
 
 export const OwnerAuditsPage = () => {
   const { t } = useLanguage();
@@ -220,7 +220,7 @@ export const OwnerAuditsPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-vsp-accent" />
+            <ShieldTick className="w-6 h-6 text-vsp-accent" variant="Outline" />
             <span>{t('owner_audits_title')}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-0.5">
@@ -234,14 +234,14 @@ export const OwnerAuditsPage = () => {
             className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white rounded-xl transition-all"
             title={t('refresh_data')}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-vsp-accent hover:bg-vsp-accentHover text-black font-bold text-xs rounded-xl shadow-lg shadow-vsp-accent/20 transition-all"
           >
-            <PlusCircle className="w-4 h-4" />
+            <AddCircle className="w-4 h-4" variant="Outline" />
             <span>{t('add_owner_manual')}</span>
           </button>
         </div>
@@ -249,16 +249,16 @@ export const OwnerAuditsPage = () => {
 
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-vsp-accent animate-spin" />
+          <RotateRight className="w-8 h-8 text-vsp-accent animate-spin" variant="Outline" />
         </div>
       ) : owners.length === 0 ? (
         <EmptyState
-          icon={CheckCircle2}
+          icon={TickCircle}
           title={t('no_pending_audits_title')}
           subtitle={t('no_pending_audits_sub')}
           actionText={t('add_owner_manual')}
           onAction={() => setShowAddModal(true)}
-          actionIcon={PlusCircle}
+          actionIcon={AddCircle}
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -321,7 +321,7 @@ export const OwnerAuditsPage = () => {
 
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant={docsCount > 0 ? 'accent' : 'default'} size="xs">
-                            <FileText className="w-3 h-3" />
+                            <DocumentText className="w-3 h-3" variant="Outline" />
                             <span>{docsCount} {t('uploaded_documents') || 'Documents'}</span>
                           </Badge>
                         </div>
@@ -360,7 +360,7 @@ export const OwnerAuditsPage = () => {
                   </div>
 
                   <Badge variant="warning" size="sm">
-                    <Clock className="w-3 h-3" />
+                    <Clock className="w-3 h-3" variant="Outline" />
                     <span>{t('pending')}</span>
                   </Badge>
                 </div>
@@ -370,11 +370,11 @@ export const OwnerAuditsPage = () => {
                   <div className="bg-vsp-card/60 border border-vsp-border rounded-xl p-3.5 space-y-1">
                     <span className="text-[11px] text-vsp-textSecondary font-semibold">{t('owner_info')}</span>
                     <div className="flex items-center gap-2 text-xs text-white font-bold">
-                      <Phone className="w-3.5 h-3.5 text-zinc-400" />
+                      <Call className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                       <span>{selectedOwner.phone || '-'}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-zinc-400">
-                      <Mail className="w-3.5 h-3.5" />
+                      <Sms className="w-3.5 h-3.5" variant="Outline" />
                       <span className="truncate">{selectedOwner.email || '-'}</span>
                     </div>
                   </div>
@@ -382,7 +382,7 @@ export const OwnerAuditsPage = () => {
                   <div className="bg-vsp-card/60 border border-vsp-border rounded-xl p-3.5 space-y-1">
                     <span className="text-[11px] text-vsp-textSecondary font-semibold">{t('governorate')}</span>
                     <div className="flex items-center gap-2 text-xs text-white font-bold">
-                      <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+                      <Location className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                       <span>{selectedOwner.governorate || '-'}</span>
                     </div>
                     <span className="text-[11px] text-zinc-500 block">
@@ -395,7 +395,7 @@ export const OwnerAuditsPage = () => {
                 <div className="bg-vsp-card/40 border border-vsp-border rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-zinc-400" />
+                      <Building className="w-4 h-4 text-zinc-400" variant="Outline" />
                       <span>{t('stadium_info')}</span>
                     </h4>
                     {linkedStadium ? (
@@ -434,7 +434,7 @@ export const OwnerAuditsPage = () => {
                 {/* Document Verification Section */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                    <FileCheck className="w-4 h-4 text-zinc-400" />
+                    <ClipboardTick className="w-4 h-4 text-zinc-400" variant="Outline" />
                     <span>{t('owner_audits_subtitle')}</span>
                   </h4>
 
@@ -450,7 +450,7 @@ export const OwnerAuditsPage = () => {
                           className="p-3 bg-vsp-card border border-vsp-border rounded-xl flex items-center justify-between group hover:border-zinc-700 transition-all"
                         >
                           <div className="flex items-center gap-2.5 truncate">
-                            <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
+                            <DocumentText className="w-4 h-4 text-zinc-400 shrink-0" variant="Outline" />
                             <span className="text-xs font-semibold text-white truncate">
                               {doc.label}
                             </span>
@@ -466,7 +466,7 @@ export const OwnerAuditsPage = () => {
                             }
                             className="p-1.5 bg-vsp-surface hover:bg-zinc-800 hover:text-white border border-vsp-border rounded-lg text-vsp-textSecondary transition-all flex items-center gap-1 text-[11px] font-bold px-2.5"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5" variant="Outline" />
                             <span>{t('view') || 'Preview'}</span>
                           </button>
                         </div>
@@ -483,9 +483,9 @@ export const OwnerAuditsPage = () => {
                     className="w-full sm:flex-1 py-3 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
                     {processing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                     ) : (
-                      <CheckCircle2 className="w-4 h-4" />
+                      <TickCircle className="w-4 h-4" variant="Outline" />
                     )}
                     <span>{t('approve_owner_btn')}</span>
                   </button>
@@ -495,7 +495,7 @@ export const OwnerAuditsPage = () => {
                     disabled={processing}
                     className="w-full sm:w-auto px-6 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
-                    <XCircle className="w-4 h-4" />
+                    <CloseCircle className="w-4 h-4" variant="Outline" />
                     <span>{t('reject_owner_btn')}</span>
                   </button>
                 </div>

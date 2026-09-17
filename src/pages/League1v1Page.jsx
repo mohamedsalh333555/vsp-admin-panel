@@ -1,35 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { 
- Trophy, 
- Users, 
- Plus, 
- Trash2, 
- Save, 
- Send, 
- CheckCircle2, 
- AlertTriangle, 
- History, 
- UserPlus, 
- Loader2, 
- Sparkles, 
- Shield, 
- Goal, 
- Zap, 
- RefreshCw,
- Eye,
- Check,
- X,
- XCircle,
- Coins,
- CreditCard,
- Award,
- Lock,
- Unlock,
- Clock,
- Calendar,
-  MapPin,
-  Filter
-} from 'lucide-react';
+import {
+  Cup,
+  Profile2User,
+  Add,
+  Trash,
+  Save2,
+  Send2,
+  TickCircle,
+  Warning2,
+  Timer1,
+  UserAdd,
+  RotateRight,
+  MagicStar,
+  ShieldTick,
+  DirectNormal,
+  Flash,
+  Refresh2,
+  Eye,
+  CloseCircle,
+  Coin,
+  Card,
+  Award,
+  Location,
+  Filter,
+} from 'iconsax-react';
 
 export const EGYPT_GOVERNORATES = [
   { id: 'Cairo', name: 'القاهرة' },
@@ -486,7 +480,7 @@ export const League1v1Page = () => {
  <div>
  <div className="flex items-center gap-3 mb-1">
  <span className="p-2.5 bg-vsp-card border border-vsp-border rounded-xl text-zinc-300">
- <Trophy className="w-7 h-7" />
+ <Cup className="w-7 h-7" variant="Outline" />
  </span>
  <div>
  <h1 className="text-2xl font-black text-white">إدارة بطولة المواجهات الفردية (1vs1)</h1>
@@ -505,7 +499,7 @@ export const League1v1Page = () => {
  className="p-2.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-zinc-400 hover:text-white rounded-xl transition-all"
  title="تحديث البيانات"
  >
- <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+ <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
  </button>
 
  <button
@@ -513,7 +507,7 @@ export const League1v1Page = () => {
  disabled={processing}
  className="flex items-center gap-2 px-5 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
  >
- <Plus className="w-4 h-4 stroke-[3]" />
+ <Add className="w-4 h-4" variant="Outline" />
  <span>بدء بطولة جديدة</span>
  </button>
  </div>
@@ -532,14 +526,14 @@ export const League1v1Page = () => {
  >
  <div className="flex items-center gap-2 text-xs font-bold">
  {alert.type === 'success' ? (
- <CheckCircle2 className="w-5 h-5 text-vsp-accent flex-shrink-0" />
+ <TickCircle className="w-5 h-5 text-vsp-accent flex-shrink-0" variant="Outline" />
  ) : (
- <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+ <Warning2 className="w-5 h-5 text-red-400 flex-shrink-0" variant="Outline" />
  )}
  <span>{alert.message}</span>
  </div>
  <button onClick={() => setAlert(null)} className="p-1 hover:opacity-80">
- <X className="w-4 h-4" />
+ <CloseCircle className="w-4 h-4" variant="Outline" />
  </button>
  </div>
  )}
@@ -556,7 +550,7 @@ export const League1v1Page = () => {
  : 'text-vsp-textSecondary hover:text-white'
  }`}
  >
- <Trophy className="w-4 h-4" />
+ <Cup className="w-4 h-4" variant="Outline" />
  <span>شيت الرصد والبطولة الحالية</span>
  {activeTournament?.status === 'published' && (
  <span className="w-2 h-2 rounded-full bg-vsp-accent animate-pulse"></span>
@@ -571,7 +565,7 @@ export const League1v1Page = () => {
  : 'text-vsp-textSecondary hover:text-white'
  }`}
  >
- <History className="w-4 h-4" />
+ <Timer1 className="w-4 h-4" variant="Outline" />
  <span>أرشيف البطولات السابقة ({historyList.length})</span>
  </button>
 
@@ -583,7 +577,7 @@ export const League1v1Page = () => {
  : 'text-vsp-textSecondary hover:text-white'
  }`}
  >
- <UserPlus className="w-4 h-4" />
+ <UserAdd className="w-4 h-4" variant="Outline" />
  <span>طلبات الانضمام المعلقة</span>
  {registrations.length > 0 && (
  <span className="px-2 py-0.5 bg-vsp-accent text-black font-black text-[10px] rounded-full">
@@ -602,7 +596,7 @@ export const League1v1Page = () => {
   <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
    <div className="flex items-center gap-3">
     <div className="p-2 bg-vsp-card border border-vsp-border rounded-xl text-zinc-400">
-     <MapPin className="w-5 h-5" />
+     <Location className="w-5 h-5" variant="Outline" />
     </div>
     <div>
      <span className="text-xs font-bold text-vsp-textSecondary block">المحافظة الحالية للرصد:</span>
@@ -652,13 +646,13 @@ export const League1v1Page = () => {
 
   {loading ? (
    <div className="p-16 flex flex-col items-center justify-center gap-3 bg-vsp-surface border border-vsp-border rounded-2xl">
-    <Loader2 className="w-8 h-8 text-vsp-accent animate-spin" />
+    <RotateRight className="w-8 h-8 text-vsp-accent animate-spin" variant="Outline" />
     <span className="text-xs text-vsp-textSecondary font-bold">جاري تحميل بيانات البطولة...</span>
    </div>
   ) : !activeTournament ? (
    <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-10 text-center space-y-4">
     <div className="w-14 h-14 mx-auto rounded-2xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
-     <Trophy className="w-7 h-7" />
+     <Cup className="w-7 h-7" variant="Outline" />
     </div>
     <div>
      <h3 className="text-lg font-bold text-white">لا توجد بطولة نشطة حالياً في محافظة {getGovArabicName(selectedGovernorate)}</h3>
@@ -670,7 +664,7 @@ export const League1v1Page = () => {
      onClick={() => handleOpenNewTournamentModal(selectedGovernorate)}
      className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
     >
-     <Plus className="w-4 h-4 stroke-[3]" />
+     <Add className="w-4 h-4" variant="Outline" />
      <span>بدء بطولة جديدة في {getGovArabicName(selectedGovernorate)}</span>
     </button>
    </div>
@@ -682,7 +676,7 @@ export const League1v1Page = () => {
       <div className="flex items-center gap-3 flex-wrap">
        <h2 className="text-lg font-black text-white">{activeTournament.name}</h2>
        <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-vsp-card text-zinc-300 border border-vsp-border flex items-center gap-1">
-        <MapPin className="w-3.5 h-3.5" />
+        <Location className="w-3.5 h-3.5" variant="Outline" />
         {getGovArabicName(activeTournament.governorate)}
        </span>
        {activeTournament.status === 'published' ? (
@@ -753,7 +747,7 @@ export const League1v1Page = () => {
  disabled={processing}
  className="flex items-center gap-2 px-4 py-2.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white text-xs font-bold rounded-xl transition-all"
  >
- <Save className="w-4 h-4 text-zinc-400" />
+ <Save2 className="w-4 h-4 text-zinc-400" variant="Outline" />
  <span>حفظ كمسودة</span>
  </button>
 
@@ -763,9 +757,9 @@ export const League1v1Page = () => {
  className="flex items-center gap-2 px-6 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
  >
  {processing ? (
- <Loader2 className="w-4 h-4 animate-spin" />
+ <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
  ) : (
- <Send className="w-4 h-4 stroke-[2.5]" />
+ <Send2 className="w-4 h-4" variant="Outline" />
  )}
  <span>حفظ ونشر الترتيب النهائي </span>
  </button>
@@ -777,7 +771,7 @@ export const League1v1Page = () => {
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-5 shadow-lg flex items-center justify-between">
  <div>
  <div className="flex items-center gap-2">
- <Coins className="w-4 h-4 text-vsp-accent" />
+ <Coin className="w-4 h-4 text-vsp-accent" variant="Outline" />
  <span className="text-[11px] font-bold text-vsp-textSecondary uppercase tracking-wider block">وعاء الجائزة المتراكم</span>
  </div>
  <div className="flex items-baseline gap-2 mt-2">
@@ -789,14 +783,14 @@ export const League1v1Page = () => {
  </span>
  </div>
  <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-300 font-black">
- <Trophy className="w-5 h-5" />
+ <Cup className="w-5 h-5" variant="Outline" />
  </div>
  </div>
 
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-5 shadow-lg flex items-center justify-between">
  <div>
  <div className="flex items-center gap-2">
- <CreditCard className="w-4 h-4 text-vsp-textSecondary" />
+ <Card className="w-4 h-4 text-vsp-textSecondary" variant="Outline" />
  <span className="text-[11px] font-bold text-vsp-textSecondary uppercase tracking-wider block">رسوم اشتراك اللاعب</span>
  </div>
  <div className="flex items-baseline gap-2 mt-2">
@@ -808,14 +802,14 @@ export const League1v1Page = () => {
  </span>
  </div>
  <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-vsp-textSecondary">
- <CreditCard className="w-5 h-5" />
+ <Card className="w-5 h-5" variant="Outline" />
  </div>
  </div>
 
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-5 shadow-lg flex items-center justify-between">
  <div>
  <div className="flex items-center gap-2">
- <Users className="w-4 h-4 text-vsp-textSecondary" />
+ <Profile2User className="w-4 h-4 text-vsp-textSecondary" variant="Outline" />
  <span className="text-[11px] font-bold text-vsp-textSecondary uppercase tracking-wider block">نسبة اكتمال المقاعد</span>
  </div>
  <div className="flex items-baseline gap-2 mt-2">
@@ -828,7 +822,7 @@ export const League1v1Page = () => {
  </span>
  </div>
  <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-vsp-textSecondary">
- <Users className="w-5 h-5" />
+ <Profile2User className="w-5 h-5" variant="Outline" />
  </div>
  </div>
  </div>
@@ -839,7 +833,7 @@ export const League1v1Page = () => {
  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
  <div className="flex items-start gap-4">
  <div className="w-12 h-12 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-vsp-accent flex-shrink-0">
- <Award className="w-6 h-6" />
+ <Award className="w-6 h-6" variant="Outline" />
  </div>
  <div>
  <div className="flex items-center gap-2">
@@ -865,7 +859,7 @@ export const League1v1Page = () => {
  {activeTournament.prize_delivered ? (
  <div className="bg-vsp-card border border-vsp-border rounded-xl p-3.5 flex flex-col items-end gap-1">
  <div className="flex items-center gap-2 text-zinc-300 font-bold text-xs">
- <CheckCircle2 className="w-4 h-4 text-vsp-accent" />
+ <TickCircle className="w-4 h-4 text-vsp-accent" variant="Outline" />
  <span>تم تسليم الجائزة رسمياً</span>
  </div>
  <span className="text-[11px] text-vsp-textSecondary">
@@ -882,7 +876,7 @@ export const League1v1Page = () => {
  onClick={() => setShowPrizeDeliveryModal(true)}
  className="flex items-center gap-2 px-5 py-2.5 bg-vsp-accent hover:bg-vsp-accentHover text-black font-bold text-xs rounded-xl shadow transition-all active:scale-95"
  >
- <Award className="w-4 h-4" />
+ <Award className="w-4 h-4" variant="Outline" />
  <span>تسجيل تسليم الجائزة يدوياً</span>
  </button>
  )}
@@ -894,7 +888,7 @@ export const League1v1Page = () => {
  {/* Scoring Formula Info Banner */}
  <div className="p-4 bg-vsp-card/50 border border-vsp-border rounded-xl flex items-center justify-between gap-4 text-xs">
  <div className="flex items-center gap-3 text-zinc-300 font-bold">
- <Sparkles className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+ <MagicStar className="w-5 h-5 text-zinc-400 flex-shrink-0" variant="Outline" />
  <span>
  معادلة رصد النقاط الواقعية: المجموع = [تدخل صحيح (تاكلينج) × 1] + [أهداف × 1] + [مهارات × 1].
  </span>
@@ -903,7 +897,7 @@ export const League1v1Page = () => {
  onClick={handleAddPlayerRow}
  className="flex items-center gap-1.5 px-3 py-1.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-zinc-200 font-bold text-xs rounded-lg transition-all"
  >
- <Plus className="w-3.5 h-3.5" />
+ <Add className="w-3.5 h-3.5" variant="Outline" />
  <span>إضافة لاعب إضافي</span>
  </button>
  </div>
@@ -918,19 +912,19 @@ export const League1v1Page = () => {
  <th className="px-5 py-4 font-bold min-w-[200px]">اسم اللاعب</th>
  <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-cyan-400">
- <Shield className="w-3.5 h-3.5" />
+ <ShieldTick className="w-3.5 h-3.5" variant="Outline" />
  <span>تاكلينج (+1)</span>
  </div>
  </th>
  <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-zinc-300 font-black">
- <Goal className="w-3.5 h-3.5" />
+ <DirectNormal className="w-3.5 h-3.5" variant="Outline" />
  <span>أهداف (+1)</span>
  </div>
  </th>
  <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-purple-400">
- <Zap className="w-3.5 h-3.5" />
+ <Flash className="w-3.5 h-3.5" variant="Outline" />
  <span>مهارات (+1)</span>
  </div>
  </th>
@@ -1012,7 +1006,7 @@ export const League1v1Page = () => {
  title="حذف هذا اللاعب"
  className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
  >
- <Trash2 className="w-4 h-4" />
+ <Trash className="w-4 h-4" variant="Outline" />
  </button>
  </td>
  </tr>
@@ -1028,7 +1022,7 @@ export const League1v1Page = () => {
  onClick={handleAddPlayerRow}
  className="flex items-center gap-2 px-4 py-2 bg-vsp-surface hover:bg-vsp-border border border-vsp-border text-white text-xs font-bold rounded-xl transition-all"
  >
- <Plus className="w-4 h-4 text-vsp-accent" />
+ <Add className="w-4 h-4 text-vsp-accent" variant="Outline" />
  <span>إضافة صف لاعب جديد</span>
  </button>
 
@@ -1050,7 +1044,7 @@ export const League1v1Page = () => {
   {/* History Governorate Filter */}
   <div className="p-4 bg-vsp-card/40 border-b border-vsp-border flex items-center justify-between gap-4">
    <div className="flex items-center gap-2">
-    <Filter className="w-4 h-4 text-zinc-400" />
+    <Filter className="w-4 h-4 text-zinc-400" variant="Outline" />
     <span className="text-xs font-bold text-zinc-300">تصفية الأرشيف حسب المحافظة:</span>
    </div>
    <select
@@ -1073,7 +1067,7 @@ export const League1v1Page = () => {
 
   {historyList.length === 0 ? (
    <EmptyState
-    icon={History}
+    icon={Timer1}
     title="لا توجد بطولات سابقة في الأرشيف"
     subtitle="عندما تقوم بنشر نسخ جديدة من البطولة، سيتم الاحتفاظ بالنسخ السابقة هنا كأرشيف دائم."
    />
@@ -1099,7 +1093,7 @@ export const League1v1Page = () => {
         <td className="px-6 py-4 font-bold text-white">{item.name}</td>
         <td className="px-6 py-4 font-bold text-zinc-300">
          <span className="px-2.5 py-1 bg-vsp-card border border-vsp-border rounded-lg text-xs flex items-center gap-1 w-fit">
-          <MapPin className="w-3 h-3 text-zinc-400" />
+          <Location className="w-3 h-3 text-zinc-400" variant="Outline" />
           {getGovArabicName(item.governorate)}
          </span>
         </td>
@@ -1132,7 +1126,7 @@ export const League1v1Page = () => {
           onClick={() => handleViewArchive(item)}
           className="flex items-center gap-1 px-3 py-1.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white rounded-lg text-xs font-bold transition-all mx-auto"
          >
-          <Eye className="w-3.5 h-3.5 text-zinc-400" />
+          <Eye className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
           <span>عرض التفاصيل</span>
          </button>
         </td>
@@ -1149,7 +1143,7 @@ export const League1v1Page = () => {
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
  {registrations.length === 0 ? (
  <EmptyState
- icon={UserPlus}
+ icon={UserAdd}
  title="لا توجد طلبات انضمام معلقة حالياً"
  subtitle="عندما يسجل اللاعبون عبر تطبيق الموبايل ستظهر طلباتهم هنا للاعتماد."
  />
@@ -1197,7 +1191,7 @@ export const League1v1Page = () => {
  disabled={processing}
  className="flex items-center gap-1 px-3 py-1.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white rounded-lg font-bold text-xs transition-all"
  >
- <CheckCircle2 className="w-3.5 h-3.5 text-vsp-accent" />
+ <TickCircle className="w-3.5 h-3.5 text-vsp-accent" variant="Outline" />
  <span>قبول</span>
  </button>
  <button
@@ -1216,7 +1210,7 @@ export const League1v1Page = () => {
  disabled={processing}
  className="flex items-center gap-1 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 rounded-lg font-bold text-xs transition-all"
  >
- <XCircle className="w-3.5 h-3.5" />
+ <CloseCircle className="w-3.5 h-3.5" variant="Outline" />
  <span>رفض</span>
  </button>
  </div>
@@ -1246,7 +1240,7 @@ export const League1v1Page = () => {
 
  <div>
  <label className="block text-xs font-bold text-zinc-300 mb-1.5 flex items-center gap-1.5">
-  <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+  <Location className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
   <span>المحافظة المستهدفة للبطولة</span>
  </label>
  <select
@@ -1357,7 +1351,7 @@ export const League1v1Page = () => {
  disabled={processing}
  className="flex items-center gap-2 px-5 py-2 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all"
  >
- {processing && <Loader2 className="w-4 h-4 animate-spin" />}
+ {processing && <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />}
  <span>تأكيد وإنشاء البطولة </span>
  </button>
  </div>

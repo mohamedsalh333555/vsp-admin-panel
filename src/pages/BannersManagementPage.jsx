@@ -1,35 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { bannersService } from '../services/bannersService';
-import { useLanguage } from '../context/LanguageContext';
-import { Toast } from '../components/ui/Toast';
-import { Badge } from '../components/ui/Badge';
-import { EmptyState } from '../components/ui/EmptyState';
-import { StatCard } from '../components/ui/StatCard';
-import { Modal } from '../components/ui/Modal';
-import { ImagePreviewModal } from '../components/ui/ImagePreviewModal';
 import {
-  Megaphone,
-  Plus,
-  RefreshCw,
-  Search,
+  Speaker,
+  Add,
+  Refresh2,
+  SearchNormal1,
   Eye,
-  MousePointerClick,
-  Layers,
+  Mouse,
+  Layer,
   Clock,
   Calendar,
-  ExternalLink,
+  ExportCurve,
   Edit2,
-  Trash2,
-  Upload,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  Percent,
+  Trash,
+  DocumentUpload,
+  TickCircle,
+  Danger,
+  RotateRight,
+  DiscountShape,
   Play,
   Pause,
-  Image as ImageIcon,
-} from 'lucide-react';
+  Gallery as ImageIcon,
+} from 'iconsax-react';
 
 const getInitialStartDate = () => {
   const nowWithBuffer = new Date(Date.now() - 5 * 60 * 1000);
@@ -328,7 +319,7 @@ export const BannersManagementPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
-            <Megaphone className="w-6 h-6 text-vsp-accent" />
+            <Speaker className="w-6 h-6 text-vsp-accent" variant="Outline" />
             <span>{t('banners_title')}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-1">
@@ -342,15 +333,15 @@ export const BannersManagementPage = () => {
             disabled={loading}
             className="px-3.5 py-2 rounded-xl bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-vsp-accent' : ''}`} />
+            <Refresh2 className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-vsp-accent' : ''}`} variant="Outline" />
             <span>{t('refresh_data')}</span>
           </button>
 
           <button
             onClick={openCreateModal}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+            className="px-4 py-2 rounded-xl bg-vsp-accent hover:bg-vsp-accentHover text-black text-xs font-black flex items-center gap-2 shadow-lg shadow-vsp-accent/20 transition-all"
           >
-            <Plus className="w-4 h-4" />
+            <Add className="w-4 h-4" variant="Outline" />
             <span>{t('add_new_banner')}</span>
           </button>
         </div>
@@ -361,7 +352,7 @@ export const BannersManagementPage = () => {
         <StatCard
           label={t('total_banners')}
           value={stats.totalBanners}
-          icon={Layers}
+          icon={Layer}
           subtext={`${stats.activeBanners} ${t('active_banners')}`}
         />
         <StatCard
@@ -379,7 +370,7 @@ export const BannersManagementPage = () => {
         <StatCard
           label={t('total_banner_clicks')}
           value={stats.totalClicks.toLocaleString()}
-          icon={MousePointerClick}
+          icon={Mouse}
           subtext={`${t('ctr_rate')}: ${stats.ctr}%`}
         />
       </div>
@@ -387,7 +378,7 @@ export const BannersManagementPage = () => {
       {/* Filter and Search Bar */}
       <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 glass-panel">
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-vsp-textSecondary absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
+          <SearchNormal1 className="w-4 h-4 text-vsp-textSecondary absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" variant="Outline" />
           <input
             type="text"
             placeholder={t('search')}
@@ -440,7 +431,7 @@ export const BannersManagementPage = () => {
       {/* Main Content: Banners Grid/List */}
       {loading ? (
         <div className="p-16 flex flex-col items-center justify-center gap-3 bg-vsp-surface border border-vsp-border rounded-2xl">
-          <Loader2 className="w-8 h-8 text-vsp-accent animate-spin" />
+          <RotateRight className="w-8 h-8 text-vsp-accent animate-spin" variant="Outline" />
           <span className="text-xs text-vsp-textSecondary">{t('loading')}</span>
         </div>
       ) : loadError ? (
@@ -450,14 +441,14 @@ export const BannersManagementPage = () => {
             title="فشل تحميل البيانات"
             description={loadError}
             actionLabel="إعادة المحاولة"
-            actionIcon={RefreshCw}
+            actionIcon={Refresh2}
             onAction={loadData}
           />
         </div>
       ) : filteredBanners.length === 0 ? (
         <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-8">
           <EmptyState
-            icon={Megaphone}
+            icon={Speaker}
             title={t('no_banners_found')}
             description={t('no_banners_sub')}
             actionLabel={t('add_new_banner')}
@@ -500,13 +491,13 @@ export const BannersManagementPage = () => {
                       className="pointer-events-auto p-1.5 rounded-lg bg-black/60 backdrop-blur-md text-zinc-300 hover:text-white hover:bg-black/80 border border-white/10 transition-all"
                       title="Preview Image"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5" variant="Outline" />
                     </button>
                   </div>
 
                   {/* Duration badge */}
                   <div className="absolute bottom-3 left-3 rtl:left-auto rtl:right-3 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-bold text-zinc-200 border border-white/10 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-vsp-accent" />
+                    <Clock className="w-3 h-3 text-vsp-accent" variant="Outline" />
                     <span>{banner.duration_seconds}s</span>
                   </div>
 
@@ -543,7 +534,7 @@ export const BannersManagementPage = () => {
                           rel="noreferrer"
                           className="px-2 py-0.5 rounded-md bg-vsp-card border border-vsp-border text-vsp-accent hover:underline flex items-center gap-1 max-w-[160px] truncate"
                         >
-                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          <ExportCurve className="w-3 h-3 flex-shrink-0" variant="Outline" />
                           <span className="truncate">{banner.target_url}</span>
                         </a>
                       )}
@@ -555,7 +546,7 @@ export const BannersManagementPage = () => {
                     {/* Dates */}
                     <div className="flex items-center justify-between text-[10px] text-zinc-500">
                       <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
+                        <Calendar className="w-3 h-3" variant="Outline" />
                         <span>
                           {banner.start_date
                             ? new Date(banner.start_date).toLocaleDateString()
@@ -586,7 +577,7 @@ export const BannersManagementPage = () => {
                       </div>
                       <div>
                         <span className="text-[10px] text-zinc-500 block">CTR</span>
-                        <span className="text-xs font-bold text-emerald-400">{ctr}%</span>
+                        <span className="text-xs font-bold text-vsp-accent">{ctr}%</span>
                       </div>
                     </div>
                   </div>
@@ -599,18 +590,18 @@ export const BannersManagementPage = () => {
                     onClick={() => handleToggleStatus(banner)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                       banner.is_active
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                        ? 'bg-vsp-accent/10 text-vsp-accent border border-vsp-accent/20 hover:bg-vsp-accent/20'
                         : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
                     }`}
                   >
                     {banner.is_active ? (
                       <>
-                        <CheckCircle className="w-3.5 h-3.5" />
+                        <TickCircle className="w-3.5 h-3.5" variant="Outline" />
                         <span>{t('banner_active_now')}</span>
                       </>
                     ) : (
                       <>
-                        <Pause className="w-3.5 h-3.5" />
+                        <Pause className="w-3.5 h-3.5" variant="Outline" />
                         <span>{t('banner_inactive')}</span>
                       </>
                     )}
@@ -622,7 +613,7 @@ export const BannersManagementPage = () => {
                       className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-vsp-card border border-transparent hover:border-vsp-border transition-all"
                       title={t('edit_banner')}
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-3.5 h-3.5" variant="Outline" />
                     </button>
 
                     <button
@@ -630,7 +621,7 @@ export const BannersManagementPage = () => {
                       className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
                       title={t('delete')}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash className="w-3.5 h-3.5" variant="Outline" />
                     </button>
                   </div>
                 </div>
@@ -705,14 +696,14 @@ export const BannersManagementPage = () => {
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                    <Upload className="w-5 h-5 text-white" />
+                    <DocumentUpload className="w-5 h-5 text-white" variant="Outline" />
                     <span className="text-xs font-bold text-white">{t('change_image')}</span>
                   </div>
                 </div>
               ) : (
                 <div className="py-6 flex flex-col items-center justify-center text-center">
                   <div className="w-12 h-12 rounded-2xl bg-vsp-card border border-vsp-border flex items-center justify-center text-vsp-accent mb-2">
-                    <ImageIcon className="w-6 h-6" />
+                    <ImageIcon className="w-6 h-6" variant="Outline" />
                   </div>
                   <span className="text-xs font-bold text-white">
                     {t('upload_image_note')}
@@ -860,9 +851,9 @@ export const BannersManagementPage = () => {
             <button
               type="submit"
               disabled={actionLoading}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-vsp-accent hover:bg-vsp-accentHover text-black text-xs font-black flex items-center gap-2 shadow-lg shadow-vsp-accent/20 transition-all"
             >
-              {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {actionLoading && <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />}
               <span>{t('save')}</span>
             </button>
           </div>
@@ -878,7 +869,7 @@ export const BannersManagementPage = () => {
       >
         <div className="space-y-4 text-center">
           <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mx-auto">
-            <Trash2 className="w-6 h-6" />
+            <Trash className="w-6 h-6" variant="Outline" />
           </div>
           <p className="text-xs text-vsp-textSecondary leading-relaxed">
             {t('confirm_delete_banner')}
@@ -899,7 +890,7 @@ export const BannersManagementPage = () => {
               onClick={handleDeleteBanner}
               className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-600/20 transition-all"
             >
-              {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {actionLoading && <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />}
               <span>{t('delete')}</span>
             </button>
           </div>

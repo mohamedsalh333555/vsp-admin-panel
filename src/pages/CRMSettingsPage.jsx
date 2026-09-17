@@ -4,18 +4,15 @@ import { useLanguage } from '../context/LanguageContext';
 import { Toast } from '../components/ui/Toast';
 import { Badge } from '../components/ui/Badge';
 import {
-  Send,
-  Wrench,
-  Bell,
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  Users,
-  Building2,
-  Smartphone,
-  Shield,
-  Megaphone,
-} from 'lucide-react';
+  Send2,
+  Designtools,
+  RotateRight,
+  Profile2User,
+  Building,
+  Mobile,
+  ShieldTick,
+  Speaker,
+} from 'iconsax-react';
 
 export const CRMSettingsPage = () => {
   const { t } = useLanguage();
@@ -109,7 +106,7 @@ export const CRMSettingsPage = () => {
       {/* Header */}
       <div>
         <h1 className="text-xl font-black text-white flex items-center gap-2">
-          <Megaphone className="w-6 h-6 text-zinc-400" />
+          <Speaker className="w-6 h-6 text-zinc-400" variant="Outline" />
           <span>{t('crm_title')}</span>
         </h1>
         <p className="text-xs text-vsp-textSecondary mt-0.5">
@@ -122,7 +119,7 @@ export const CRMSettingsPage = () => {
         <div className="lg:col-span-7 bg-vsp-surface border border-vsp-border rounded-2xl p-6 space-y-5">
           <div className="flex items-center gap-3 border-b border-vsp-border pb-4">
             <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
-              <Send className="w-5 h-5" />
+              <Send2 className="w-5 h-5" variant="Outline" />
             </div>
             <div>
               <h3 className="font-bold text-white text-sm">{t('broadcast_card_title')}</h3>
@@ -137,9 +134,9 @@ export const CRMSettingsPage = () => {
               <label className="block text-xs font-bold text-white mb-2">{t('target_audience_label')}</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: 'all', label: t('audience_all'), icon: Users },
-                  { id: 'players', label: t('audience_players'), icon: Smartphone },
-                  { id: 'owners', label: t('audience_owners'), icon: Building2 },
+                  { id: 'all', label: t('audience_all'), icon: Profile2User },
+                  { id: 'players', label: t('audience_players'), icon: Mobile },
+                  { id: 'owners', label: t('audience_owners'), icon: Building },
                 ].map((aud) => {
                   const Icon = aud.icon;
                   const isSelected = notif.targetAudience === aud.id;
@@ -154,7 +151,7 @@ export const CRMSettingsPage = () => {
                           : 'bg-vsp-card text-vsp-textSecondary border-vsp-border hover:text-white'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="w-4 h-4" variant="Outline" />
                       <span>{aud.label}</span>
                     </button>
                   );
@@ -195,7 +192,7 @@ export const CRMSettingsPage = () => {
               disabled={sending}
               className="w-full py-3 bg-vsp-accent hover:bg-vsp-accentHover text-black font-extrabold text-xs rounded-xl shadow-lg shadow-vsp-accent/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {sending ? <RotateRight className="w-4 h-4 animate-spin" variant="Outline" /> : <Send2 className="w-4 h-4" variant="Outline" />}
               <span>{sending ? t('processing') : t('send_notif_btn')}</span>
             </button>
           </form>
@@ -207,7 +204,7 @@ export const CRMSettingsPage = () => {
           <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
-                <Wrench className="w-5 h-5" />
+                <Designtools className="w-5 h-5" variant="Outline" />
               </div>
               <div>
                 <h3 className="font-bold text-white text-sm">{t('maintenance_title')}</h3>
@@ -225,7 +222,7 @@ export const CRMSettingsPage = () => {
               <div className="flex items-center gap-2">
                 <span
                   className={`w-3 h-3 rounded-full ${
-                    maintenance ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'
+                    maintenance ? 'bg-vsp-accent animate-ping' : 'bg-zinc-600'
                   }`}
                 />
                 <span className="text-xs font-bold text-white">
@@ -237,7 +234,7 @@ export const CRMSettingsPage = () => {
                 onClick={toggleMaintenance}
                 className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
                   maintenance
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-black'
+                    ? 'bg-vsp-accent hover:bg-vsp-accentHover text-black'
                     : 'bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/40'
                 }`}
               >
@@ -249,14 +246,14 @@ export const CRMSettingsPage = () => {
           {/* Infrastructure Health */}
           <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-6 space-y-3">
             <h3 className="font-bold text-white text-sm flex items-center gap-2">
-              <Shield className="w-4 h-4 text-vsp-accent" />
+              <ShieldTick className="w-4 h-4 text-vsp-accent" variant="Outline" />
               <span>{t('infra_health_title')}</span>
             </h3>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-2.5 bg-vsp-card rounded-lg">
                 <span className="text-vsp-textSecondary">{t('infra_db')}</span>
-                <Badge variant="success" size="xs">
+                <Badge variant="accent" size="xs">
                   {t('infra_db_status')}
                 </Badge>
               </div>

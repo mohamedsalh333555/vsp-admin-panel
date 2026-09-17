@@ -6,24 +6,24 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
-  Trophy,
-  RefreshCw,
-  CheckCircle,
+  Cup,
+  Refresh2,
+  TickCircle,
   Clock,
   Play,
-  Loader2,
+  RotateRight,
   Calendar,
-  Users,
-  Building2,
-  GitBranch,
-  Flame,
+  Profile2User,
+  Building,
+  Hierarchy,
+  Flash,
   Award,
-  AlertTriangle,
+  Warning2,
   Check,
-  X,
-  ShieldCheck,
-  MapPin,
-} from 'lucide-react';
+  CloseCircle,
+  ShieldTick,
+  Location,
+} from 'iconsax-react';
 
 export const TournamentControlPage = () => {
   const { t } = useLanguage();
@@ -186,7 +186,7 @@ export const TournamentControlPage = () => {
         >
           <div className="space-y-4">
             <div className="p-3 bg-zinc-800/80 border border-zinc-700 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
+              <Warning2 className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" variant="Outline" />
               <div className="text-xs text-zinc-300 leading-relaxed">
                 <p className="font-bold text-white mb-1">
                   تنبيه أمني وتنظيمي:
@@ -231,9 +231,9 @@ export const TournamentControlPage = () => {
                 className="flex-1 py-2.5 bg-vsp-accent hover:bg-vsp-accent/90 text-black rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-vsp-accent/20"
               >
                 {confirmingBracket ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                 ) : (
-                  <GitBranch className="w-4 h-4" />
+                  <Hierarchy className="w-4 h-4" variant="Outline" />
                 )}
                 <span>تأكيد وإطلاق القرعة</span>
               </button>
@@ -270,7 +270,7 @@ export const TournamentControlPage = () => {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-vsp-textSecondary">قيمة الجائزة المسلمة (الوعاء الفعلي):</span>
-                <span className="font-bold text-emerald-400 text-sm">
+                <span className="font-bold text-vsp-accent text-sm">
                   {Number(selectedForPrizeDelivery.prize_pool || selectedForPrizeDelivery.grand_prize || 0).toLocaleString()} {t('currency')}
                 </span>
               </div>
@@ -320,13 +320,13 @@ export const TournamentControlPage = () => {
                 className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
                   !confirmDeliveryCheck || deliveringPrize
                     ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                    : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
+                    : 'bg-zinc-100 hover:bg-white text-black font-extrabold'
                 }`}
               >
                 {deliveringPrize ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                 ) : (
-                  <Award className="w-4 h-4" />
+                  <Award className="w-4 h-4" variant="Outline" />
                 )}
                 <span>تأكيد التسليم وتوثيق السجل</span>
               </button>
@@ -350,7 +350,7 @@ export const TournamentControlPage = () => {
         >
           <div className="space-y-4">
             <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <Warning2 className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" variant="Outline" />
               <div className="text-xs text-rose-200/90 leading-relaxed">
                 <p className="font-bold text-rose-300 mb-1">
                   تحذير: سيتم حذف البطولة وإشعار المالك
@@ -407,9 +407,9 @@ export const TournamentControlPage = () => {
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-600/20"
               >
                 {rejecting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                 ) : (
-                  <X className="w-4 h-4" />
+                  <CloseCircle className="w-4 h-4" variant="Outline" />
                 )}
                 <span>تأكيد الرفض والحذف</span>
               </button>
@@ -422,7 +422,7 @@ export const TournamentControlPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-vsp-accent" />
+            <Cup className="w-6 h-6 text-vsp-accent" variant="Outline" />
             <span>{t('tournaments_title')}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-0.5">
@@ -434,7 +434,7 @@ export const TournamentControlPage = () => {
           onClick={fetchTournaments}
           className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white rounded-xl transition-all self-end sm:self-auto"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
         </button>
       </div>
 
@@ -519,17 +519,17 @@ export const TournamentControlPage = () => {
 
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-vsp-border/50 text-xs">
                       <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                        <Users className="w-3.5 h-3.5 text-zinc-400" />
+                        <Profile2User className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                         <span>{champ.max_teams || 16} {t('teams_count_col')}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                        <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+                        <Location className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
                         <span>{champ.governorate || 'القاهرة'}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        <Award className="w-3.5 h-3.5 text-vsp-accent" variant="Outline" />
                         <span>
                           {champ.prize_pool && Number(champ.prize_pool) > 0
                             ? `${Number(champ.prize_pool).toLocaleString()} ${t('currency')}`
@@ -554,12 +554,12 @@ export const TournamentControlPage = () => {
                       type="button"
                       disabled={isActioning}
                       onClick={() => handleApproveChampionship(champ.id)}
-                      className="flex-1 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 hover:border-emerald-500 text-emerald-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 border border-vsp-accent/40 hover:border-vsp-accent text-vsp-accent rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                     >
                       {isActioning ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <RotateRight className="w-3.5 h-3.5 animate-spin" variant="Outline" />
                       ) : (
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-3.5 h-3.5" variant="Outline" />
                       )}
                       <span>موافقة ونشر</span>
                     </button>
@@ -573,7 +573,7 @@ export const TournamentControlPage = () => {
                       }}
                       className="flex-1 py-2 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 hover:border-rose-500 text-rose-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <CloseCircle className="w-3.5 h-3.5" variant="Outline" />
                       <span>رفض البطولة</span>
                     </button>
                   </div>
@@ -584,7 +584,7 @@ export const TournamentControlPage = () => {
         )
       ) : approvedTournaments.length === 0 ? (
         <EmptyState
-          icon={Trophy}
+          icon={Cup}
           title={t('no_tournaments_title')}
           subtitle=""
         />
@@ -626,12 +626,12 @@ export const TournamentControlPage = () => {
 
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-vsp-border/50 text-xs">
                     <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                      <Users className="w-3.5 h-3.5 text-vsp-accent" />
+                      <Profile2User className="w-3.5 h-3.5 text-vsp-accent" variant="Outline" />
                       <span>{champ.max_teams || 16} {t('teams_count_col')}</span>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-vsp-textSecondary">
-                      <Award className="w-3.5 h-3.5 text-vsp-accent" />
+                      <Award className="w-3.5 h-3.5 text-vsp-accent" variant="Outline" />
                       <span>
                         {champ.prize_pool && Number(champ.prize_pool) > 0
                           ? `${Number(champ.prize_pool).toLocaleString()} ${t('currency')} (وعاء فعلي)`
@@ -649,7 +649,7 @@ export const TournamentControlPage = () => {
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-zinc-400 font-medium">حالة الجائزة:</span>
                       {champ.prize_delivered ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-vsp-accent/10 text-vsp-accent border border-vsp-accent/20">
                           تم التسليم
                         </span>
                       ) : (
@@ -666,9 +666,9 @@ export const TournamentControlPage = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedForPrizeDelivery(champ)}
-                        className="w-full py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                        className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-vsp-accent/30 text-vsp-accent rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                       >
-                        <Award className="w-3.5 h-3.5" />
+                        <Award className="w-3.5 h-3.5" variant="Outline" />
                         <span>توثيق تسليم الجائزة للبطل</span>
                       </button>
                     )}
@@ -688,7 +688,7 @@ export const TournamentControlPage = () => {
                           : 'bg-vsp-card hover:bg-vsp-border border-vsp-border text-white hover:border-vsp-accent/40'
                       }`}
                     >
-                      <GitBranch className={`w-3.5 h-3.5 ${isOngoing || isCompleted ? 'text-zinc-600' : 'text-vsp-accent'}`} />
+                      <Hierarchy className={`w-3.5 h-3.5 ${isOngoing || isCompleted ? 'text-zinc-600' : 'text-vsp-accent'}`} variant="Outline" />
                       <span>{isOngoing ? 'القرعة جارية' : isCompleted ? 'مكتملة' : (t('generate_bracket_btn') || 'توليد القرعة')}</span>
                     </button>
 
@@ -699,7 +699,7 @@ export const TournamentControlPage = () => {
                       disabled={isProcessing}
                       className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 hover:border-zinc-500 font-bold text-[11px] rounded-xl flex items-center justify-center gap-1.5 transition-all"
                     >
-                      {isOngoing ? <CheckCircle className="w-3.5 h-3.5 text-vsp-accent" /> : <Play className="w-3.5 h-3.5 text-zinc-400" />}
+                      {isOngoing ? <TickCircle className="w-3.5 h-3.5 text-vsp-accent" variant="Outline" /> : <Play className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />}
                       <span>{isOngoing ? t('completed') : 'بدء البطولة'}</span>
                     </button>
                   </div>

@@ -7,23 +7,23 @@ import { Toast } from '../components/ui/Toast';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
-  CreditCard,
-  RefreshCw,
-  CheckCircle2,
+  Card,
+  Refresh2,
+  TickCircle,
   Clock,
-  Search,
-  DollarSign,
-  Loader2,
-  Receipt,
-  Download,
-  TrendingUp,
-  Landmark,
-  Smartphone,
+  SearchNormal1,
+  DollarCircle,
+  RotateRight,
+  ReceiptItem,
+  DocumentDownload,
+  TrendUp,
+  Bank,
+  Mobile,
   Check,
-  Send,
-  AlertCircle,
-  Wallet,
-} from 'lucide-react';
+  Send2,
+  Danger,
+  Wallet2,
+} from 'iconsax-react';
 
 export const PayoutSettlementsPage = () => {
   const { t, isRTL } = useLanguage();
@@ -197,7 +197,7 @@ export const PayoutSettlementsPage = () => {
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-3.5 py-2 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-zinc-300 hover:text-white text-xs font-bold rounded-xl transition-all"
           >
-            <Download className="w-3.5 h-3.5 text-zinc-400" />
+            <DocumentDownload className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
             <span>{t('export_data')}</span>
           </button>
 
@@ -207,7 +207,7 @@ export const PayoutSettlementsPage = () => {
             className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-zinc-400 hover:text-white rounded-xl transition-all disabled:opacity-50"
             title={t('refresh_data')}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
           </button>
         </div>
       </div>
@@ -217,13 +217,13 @@ export const PayoutSettlementsPage = () => {
         <StatCard
           label={t('kpi_online_collected')}
           value={`${Number(financialData.kpis.totalOnlineCollected || 0).toLocaleString()} ${t('currency')}`}
-          icon={Wallet}
+          icon={Wallet2}
           subtext={t('kpi_online_subtext')}
         />
         <StatCard
           label={t('kpi_platform_commission')}
           value={`${Number(financialData.kpis.totalPlatformRevenue || 0).toLocaleString()} ${t('currency')}`}
-          icon={DollarSign}
+          icon={DollarCircle}
           subtext={t('kpi_platform_subtext')}
         />
         <StatCard
@@ -235,7 +235,7 @@ export const PayoutSettlementsPage = () => {
         <StatCard
           label={t('kpi_total_settled')}
           value={`${Number(financialData.kpis.totalSettledPayouts || 0).toLocaleString()} ${t('currency')}`}
-          icon={CheckCircle2}
+          icon={TickCircle}
           subtext={t('kpi_settled_subtext')}
         />
       </div>
@@ -279,7 +279,7 @@ export const PayoutSettlementsPage = () => {
 
         {activeTab === 'matrix' && (
           <div className="relative w-full sm:w-72">
-            <Search className={`w-4 h-4 text-zinc-500 absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3.5' : 'left-3.5'}`} />
+            <SearchNormal1 className={`w-4 h-4 text-zinc-500 absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3.5' : 'left-3.5'}`} variant="Outline" />
             <input
               type="text"
               value={search}
@@ -296,14 +296,14 @@ export const PayoutSettlementsPage = () => {
       {/* Main Content View */}
       {loading ? (
         <div className="h-64 flex items-center justify-center bg-vsp-surface border border-vsp-border rounded-2xl">
-          <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+          <RotateRight className="w-8 h-8 text-zinc-400 animate-spin" variant="Outline" />
         </div>
       ) : activeTab === 'matrix' ? (
         /* TAB 1: OWNER ACCOUNTS & BALANCES MATRIX */
         <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
           {filteredOwners.length === 0 ? (
             <EmptyState
-              icon={CreditCard}
+              icon={Card}
               title={t('no_data')}
               subtitle=""
             />
@@ -350,13 +350,13 @@ export const PayoutSettlementsPage = () => {
                                 ) : owner.payoutMethod === 'vodafone_cash' ? (
                                   <span className="text-rose-400 font-bold">{t('vodafone_cash')}:</span>
                                 ) : (
-                                  <span className="text-emerald-400 font-bold">{t('bank_transfer')}:</span>
+                                  <span className="text-vsp-accent font-bold">{t('bank_transfer')}:</span>
                                 )}
                                 <span>{owner.payoutDestination}</span>
                               </span>
                             ) : (
                               <span className="text-zinc-500 italic flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3 text-zinc-500" />
+                                <Danger className="w-3 h-3 text-zinc-500" variant="Outline" />
                                 <span>{t('no_destination_registered')}</span>
                               </span>
                             )}
@@ -373,7 +373,7 @@ export const PayoutSettlementsPage = () => {
                         </td>
 
                         <td className="px-6 py-4">
-                          <span className="font-bold text-emerald-400 font-mono">
+                          <span className="font-bold text-vsp-accent font-mono">
                             {Number(owner.onlineVolume || 0).toLocaleString()} {t('currency')}
                           </span>
                         </td>
@@ -421,7 +421,7 @@ export const PayoutSettlementsPage = () => {
                               onClick={() => openSettlementModal(owner)}
                               className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 hover:border-zinc-500 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 mx-auto"
                             >
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <Check className="w-3.5 h-3.5 text-vsp-accent" variant="Outline" />
                               <span>{t('settle_now_btn')}</span>
                             </button>
                           ) : (
@@ -443,7 +443,7 @@ export const PayoutSettlementsPage = () => {
         <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
           {financialData.transactions.length === 0 ? (
             <EmptyState
-              icon={Receipt}
+              icon={ReceiptItem}
               title={t('no_data')}
               subtitle=""
             />
@@ -463,32 +463,27 @@ export const PayoutSettlementsPage = () => {
                 <tbody className="divide-y divide-vsp-border/50">
                   {financialData.transactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-vsp-card/30 transition-colors">
-                      <td className="px-6 py-4 font-mono text-[11px] text-zinc-400 font-bold">
-                        {tx.reference_number || `#${tx.id?.substring(0, 8)}`}
-                      </td>
+                      <td className="px-6 py-4 font-mono font-bold text-white">#{tx.id}</td>
                       <td className="px-6 py-4">
-                        <Badge variant="default" size="xs">
-                          {tx.type === 'payout' ? t('settle_now_btn') : t('confirmed')}
+                        <Badge variant="accent" size="xs">
+                          {tx.status}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-black text-white font-mono">
-                          {Number(tx.amount || 0).toLocaleString()} {t('currency')}
-                        </span>
+                      <td className="px-6 py-4 font-mono font-bold text-white">
+                        {Number(tx.total_price || 0).toLocaleString()} {t('currency')}
                       </td>
                       <td className="px-6 py-4 text-vsp-textSecondary">
                         {tx.payment_method || '-'}
                       </td>
-                      <td className="px-6 py-4">
-                        <Badge
-                          variant={tx.status === 'completed' || tx.status === 'paid' ? 'success' : 'warning'}
-                          size="xs"
-                        >
-                          {tx.status === 'completed' || tx.status === 'paid' ? t('completed') : t('pending')}
-                        </Badge>
+                      <td className="px-6 py-4 text-vsp-textSecondary">
+                        {tx.payout_settlement_id ? (
+                          <span className="text-vsp-accent font-semibold">{t('settled')}</span>
+                        ) : (
+                          <span className="text-zinc-500 font-semibold">{t('pending')}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-zinc-400 font-mono text-[11px]">
-                        {tx.created_at ? new Date(tx.created_at).toLocaleString() : '-'}
+                        {tx.created_at ? new Date(tx.created_at).toLocaleDateString(t('lang_button') === 'English' ? 'ar-EG' : 'en-US') : '-'}
                       </td>
                     </tr>
                   ))}
@@ -502,7 +497,7 @@ export const PayoutSettlementsPage = () => {
         <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
           {financialData.settlements.length === 0 ? (
             <EmptyState
-              icon={CheckCircle2}
+              icon={TickCircle}
               title={t('no_data')}
               subtitle=""
             />
@@ -525,7 +520,7 @@ export const PayoutSettlementsPage = () => {
                       <td className="px-6 py-4 font-bold text-white">
                         {set.users?.name || set.owner_name || 'صاحب ملعب'}
                       </td>
-                      <td className="px-6 py-4 font-mono font-bold text-emerald-400">
+                      <td className="px-6 py-4 font-mono font-bold text-vsp-accent">
                         {Number(set.amount || 0).toLocaleString()} {t('currency')}
                       </td>
                       <td className="px-6 py-4 text-vsp-textSecondary">
@@ -569,7 +564,7 @@ export const PayoutSettlementsPage = () => {
                 </div>
                 <div className="text-left">
                   <div className="text-xs text-vsp-textSecondary">{t('net_withdrawable_col')}:</div>
-                  <div className="text-lg font-black text-emerald-400 font-mono mt-0.5">
+                  <div className="text-lg font-black text-vsp-accent font-mono mt-0.5">
                     {Number(selectedOwner.netBalance || 0).toLocaleString()} {t('currency')}
                   </div>
                 </div>
@@ -650,9 +645,9 @@ export const PayoutSettlementsPage = () => {
                 className="flex-1 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {isProcessing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
                 ) : (
-                  <CheckCircle2 className="w-4 h-4" />
+                  <TickCircle className="w-4 h-4" variant="Outline" />
                 )}
                 <span>{t('confirm_payout_btn')}</span>
               </button>

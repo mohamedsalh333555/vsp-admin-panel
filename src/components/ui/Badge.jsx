@@ -5,7 +5,7 @@ export const Badge = ({ children, variant = 'default', size = 'sm' }) => {
     default: 'bg-zinc-800/80 text-zinc-300 border-zinc-700/80',
     accent: 'bg-zinc-800 text-zinc-200 border-zinc-700',
     primary: 'bg-zinc-800 text-zinc-200 border-zinc-700',
-    success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    success: 'bg-vsp-accent/10 text-vsp-accent border-vsp-accent/20',
     warning: 'bg-zinc-800/80 text-zinc-300 border-zinc-700/80',
     danger: 'bg-red-500/10 text-red-400 border-red-500/20',
     blue: 'bg-zinc-800 text-zinc-300 border-zinc-700',
