@@ -333,7 +333,7 @@ const COFOUNDER_EMAILS = [
           <div className="h-64 flex items-center justify-center">
             <RotateRight className="w-8 h-8 text-zinc-400 animate-spin" variant="Outline" />
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : users.length === 0 ? (
           <EmptyState
             icon={UserRemove}
             title={t('no_users_found')}
@@ -614,3 +614,4 @@ const COFOUNDER_EMAILS = [
     </div>
   );
 };
+

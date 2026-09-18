@@ -4,6 +4,7 @@ import { useLanguage } from './context/LanguageContext';
 import { AdminHeader } from './components/AdminHeader';
 import { AdminSidebar } from './components/AdminSidebar';
 import { NetworkBanner } from './components/NetworkBanner';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardOverview } from './pages/DashboardOverview';
 import { OwnerAuditsPage } from './pages/OwnerAuditsPage';
@@ -137,7 +138,11 @@ export default function App() {
             title={getPageTitle()}
             onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           />
-          <main className="flex-1 overflow-y-auto">{renderContent()}</main>
+          <main className="flex-1 overflow-y-auto">
+            <ErrorBoundary key={activeTab}>
+              {renderContent()}
+            </ErrorBoundary>
+          </main>
         </div>
       </div>
     </div>

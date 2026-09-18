@@ -1407,96 +1407,73 @@ class AdminService {
   }
 
   // =========================================================================
-  // MODULE G: ENTERPRISE FINANCIAL CLEARING & PAYOUT LEDGER
+  // MODULE G: ENTERPRISE FINANCIAL CLEARING & PAYOUT LEDGER (SSOT ALIGNED)
   // =========================================================================
   async fetchFinancialOverview() {
     try {
-      // 1. Fetch owners, stadiums, bookings, transactions, and payout settlements in parallel
-      const [ownersRes, stadiumsRes, bookingsRes, txRes, payoutsRes] = await Promise.all([
-        this.client.from('users').select('*').eq('role', 'owner'),
-        this.client.from('stadiums').select('*'),
-        this.client.from('bookings').select('*'),
+      // 1. Fetch from authoritative PostgreSQL Reconciliation View, along with auxiliary metadata
+      const [reconRes, ownersRes, stadiumsRes, upcomingRes, txRes, payoutsRes] = await Promise.all([
+        this.client.from('v_financial_reconciliation').select('*'),
+        this.client.from('users').select('id, name, phone, email, governorate, p2p_vodafone, p2p_instapay, p2p_bank').eq('role', 'owner'),
+        this.client.from('stadiums').select('id, name, owner_id'),
+        this.client.from('bookings').select('id, stadium_id, owner_id, total_price, deposit_paid, start_time, stadium_name, status')
+          .eq('status', 'confirmed')
+          .order('start_time', { ascending: true }),
         this.client.from('transactions').select('*').order('created_at', { ascending: false }),
         this.client.from('payout_settlements').select('*, users(name, phone, email, governorate)').order('created_at', { ascending: false }),
       ]);
 
+      const reconList = reconRes.data || [];
       const owners = ownersRes.data || [];
       const stadiums = stadiumsRes.data || [];
-      const bookings = bookingsRes.data || [];
+      const confirmedBookings = upcomingRes.data || [];
       const transactions = txRes.data || [];
       const settlements = payoutsRes.data || [];
 
-      // Calculate aggregated metrics per owner
+      // Create indexed lookups
+      const reconMap = new Map(reconList.map((r) => [r.owner_id, r]));
+      const ownerStadiumsMap = new Map();
+      stadiums.forEach((s) => {
+        if (!ownerStadiumsMap.has(s.owner_id)) ownerStadiumsMap.set(s.owner_id, []);
+        ownerStadiumsMap.get(s.owner_id).push(s);
+      });
+
+      // 2. Aggregate clearing matrix per owner based on PostgreSQL SSOT
       const ownerMatrix = owners.map((owner) => {
-        const ownerStadiums = stadiums.filter((s) => s.owner_id === owner.id);
-        const stadiumIds = new Set(ownerStadiums.map((s) => s.id));
-        const ownerBookings = bookings.filter(
-          (b) => stadiumIds.has(b.stadium_id) && (b.status === 'confirmed' || b.status === 'completed')
-        );
+        const recon = reconMap.get(owner.id) || {};
+        const ownerStadiums = ownerStadiumsMap.get(owner.id) || [];
+        const stadiumNames = ownerStadiums.map((s) => s.name).join(', ') || 'ملعب رئيسي';
 
-        let grossVolume = 0;
-        let onlineCollected = 0; // Total online funds held in gateway (620 EGP)
-        let completedOnlineCollected = 0; // Finished matches ready for disbursement (520 EGP)
-        let escrowOnlineHeld = 0; // Future matches held in escrow (100 EGP)
-        let upcomingBookings = [];
-        let platformCommission = 0;
+        // Escrow upcoming bookings for this owner
+        const upcomingBookings = confirmedBookings
+          .filter((b) => b.owner_id === owner.id || ownerStadiums.some((s) => s.id === b.stadium_id))
+          .map((b) => ({
+            id: b.id,
+            amount: Number(b.deposit_paid > 0 && b.deposit_paid < b.total_price ? b.deposit_paid : b.total_price || 0),
+            startTime: b.start_time,
+            stadiumName: b.stadium_name || 'ملعب',
+          }));
 
-        ownerBookings.forEach((b) => {
-          const price = Number(b.total_price || 0);
-          const deposit = Number(b.deposit_paid || 0);
-          const method = (b.payment_method || '').toLowerCase().trim();
-          const paymentSource = (b.payment_source || '').toLowerCase().trim();
-          const hasOnlineTxn = Boolean(b.paymob_transaction_id) || Boolean(b.payment_transaction_id) || Boolean(b.paymob_order_id);
-          const isOnlineMethod = method === 'online' || method === 'paymob' || method === 'card' || method === 'wallet' || paymentSource === 'paymob';
-          const isOnlineDeposit = b.is_deposit_paid || deposit > 0;
-          const isFlutterOnline = paymentSource !== 'cash' && paymentSource !== '';
+        // Authoritative values from PostgreSQL View
+        const completedOnlineRevenue = Number(recon.total_online_revenue || 0);
+        const platformCommission = Number(recon.total_platform_commission || 0);
+        const gatewayFees = Number(recon.total_gateway_fees || 0);
+        const totalPaidOut = Number(recon.total_withdrawn || 0);
+        const pendingPayouts = Number(recon.pending_payouts || 0);
+        const cashDebt = Number(recon.accumulated_cash_debt || 0);
+        const cashRevenue = Number(recon.total_pitch_cash_revenue || 0);
+        const completedBookingsCount = Number(recon.completed_bookings_count || recon.active_bookings_count || 0);
 
-          // A booking is considered online/platform-collected if paid digitally, has deposit paid, or payment_source is not cash
-          const isOnline = isOnlineDeposit || hasOnlineTxn || isOnlineMethod || isFlutterOnline;
-          const collected = (deposit > 0 && deposit < price) ? deposit : price;
+        // Escrow held from upcoming confirmed bookings
+        const escrowHeld = upcomingBookings.reduce((sum, b) => sum + b.amount, 0);
 
-          grossVolume += price;
+        // Net Earnings & Authoritative Available Balance (Zero-Trust SSOT)
+        const netOnlineEarnings = Math.max(0, completedOnlineRevenue - gatewayFees - platformCommission);
+        const netBalance = Math.max(0, Math.round((netOnlineEarnings - totalPaidOut - pendingPayouts - cashDebt) * 100) / 100);
 
-          if (isOnline) {
-            onlineCollected += collected;
-            if (b.status === 'completed') {
-              completedOnlineCollected += collected;
-            } else if (b.status === 'confirmed') {
-              escrowOnlineHeld += collected;
-              upcomingBookings.push({
-                id: b.id,
-                amount: collected,
-                startTime: b.start_time,
-                stadiumName: b.stadium_name || 'ملعب',
-              });
-            }
-
-            // Server-recorded vsp_commission if present, or 2% pure platform fee on online volume
-            const serverFee = Number(b.vsp_commission || 0);
-            const fee = serverFee > 0 ? serverFee : Math.round(collected * 0.02 * 100) / 100;
-            platformCommission += fee;
-          }
-        });
-
-        // Calculate settled payouts to this owner
-        const ownerPayouts = settlements.filter(
-          (s) => (s.owner_id === owner.id || s.user_id === owner.id) && (s.status === 'paid' || s.status === 'completed')
-        );
-        const ownerPaidTransactions = transactions.filter(
-          (t) => t.user_id === owner.id && t.type === 'payout' && t.status === 'completed'
-        );
-
-        const totalPaidOut =
-          ownerPayouts.reduce((sum, s) => sum + Number(s.amount || 0), 0) +
-          ownerPaidTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-        // Net Payable to Owner right now: ONLY completed online bookings minus already settled payouts (Matches App 520 EGP!)
-        const netBalance = Math.max(0, Math.round((completedOnlineCollected - totalPaidOut) * 100) / 100);
-        const escrowHeld = Math.round(escrowOnlineHeld * 100) / 100;
-
+        // Payout Method & Destination
         let payoutMethod = null;
         let payoutDestination = null;
-
         if (owner.p2p_vodafone && owner.p2p_vodafone.trim()) {
           payoutMethod = 'vodafone_cash';
           payoutDestination = owner.p2p_vodafone.trim();
@@ -1515,15 +1492,16 @@ class AdminService {
           email: owner.email,
           governorate: owner.governorate || 'غير محدد',
           stadiumCount: ownerStadiums.length,
-          stadiumNames: ownerStadiums.map((s) => s.name).join(', ') || 'ملعب رئيسي',
-          completedBookingsCount: ownerBookings.filter((b) => b.status === 'completed').length,
-          totalBookingsCount: ownerBookings.length,
-          grossVolume,
-          onlineVolume: onlineCollected,
-          completedOnlineCollected,
+          stadiumNames,
+          completedBookingsCount,
+          totalBookingsCount: completedBookingsCount + upcomingBookings.length,
+          grossVolume: completedOnlineRevenue + cashRevenue + escrowHeld,
+          onlineVolume: completedOnlineRevenue + escrowHeld,
+          completedOnlineCollected: completedOnlineRevenue,
           escrowHeld,
           upcomingBookings,
           platformCommission,
+          accumulatedCashDebt: cashDebt,
           totalPaidOut,
           netBalance,
           isDueToOwner: netBalance > 0,
@@ -1535,7 +1513,7 @@ class AdminService {
         };
       });
 
-      // Overall System Financial KPIs
+      // 3. Overall System Financial KPIs
       const totalGrossSystemVolume = ownerMatrix.reduce((sum, o) => sum + o.grossVolume, 0);
       const totalOnlineCollected = ownerMatrix.reduce((sum, o) => sum + o.onlineVolume, 0);
       const totalPlatformRevenue = ownerMatrix.reduce((sum, o) => sum + o.platformCommission, 0);
@@ -1559,7 +1537,7 @@ class AdminService {
         },
       };
     } catch (e) {
-      console.error('Error in fetchFinancialOverview:', e);
+      console.error('[AdminService] Error in fetchFinancialOverview from SSOT view:', e);
       return {
         ownerMatrix: [],
         transactions: [],
@@ -1569,6 +1547,7 @@ class AdminService {
           totalOnlineCollected: 0,
           totalPlatformRevenue: 0,
           totalPendingOwnerDues: 0,
+          totalEscrowHeld: 0,
           totalSettledPayouts: 0,
         },
       };
