@@ -249,7 +249,7 @@ class AdminService {
   // =========================================================================
   async fetchPendingOwners() {
     try {
-      const [usersRes, unverifiedStadiumsRes] = await Promise.all([
+      const [usersRes, unverifiedStadiumsRes, allStadiumsRes] = await Promise.all([
         this.client
           .from('users')
           .select('*')
@@ -260,13 +260,22 @@ class AdminService {
           .from('stadiums')
           .select('owner_id')
           .eq('is_verified', false),
+        this.client
+          .from('stadiums')
+          .select('*'),
       ]);
 
       if (usersRes.error) throw usersRes.error;
 
       const unverifiedOwnerIds = new Set((unverifiedStadiumsRes.data || []).map((s) => s.owner_id));
+      const stadiumsByOwner = new Map();
+      (allStadiumsRes.data || []).forEach((s) => {
+        if (s.owner_id && !stadiumsByOwner.has(s.owner_id)) {
+          stadiumsByOwner.set(s.owner_id, s);
+        }
+      });
 
-      return (usersRes.data || []).filter((u) => {
+      const filtered = (usersRes.data || []).filter((u) => {
         const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(u.role?.toLowerCase());
         if (isAdminRole) return false;
         const isPending = u.verification_status === 'pending' || !u.verification_status;
@@ -278,6 +287,30 @@ class AdminService {
           Boolean(u.additional_data?.taxCardUrl);
 
         return (isPending && hasOwnerIntent) || hasUnverifiedStadium;
+      });
+
+      return filtered.map((u) => {
+        const stadium = stadiumsByOwner.get(u.id) || null;
+        const addData = u.additional_data || {};
+        const docs = addData.verificationDocuments || addData.documents || {};
+        const hasDocs = Boolean(
+          docs.commercialRegisterUrl || addData.commercial_register_url ||
+          docs.taxCardUrl || addData.tax_card_url ||
+          docs.nationalIdFrontUrl || addData.national_id_front_url ||
+          docs.nationalIdBackUrl || addData.national_id_back_url ||
+          docs.leaseContractUrl || addData.lease_contract_url
+        );
+        const hasStadium = Boolean(stadium || u.has_stadium);
+        const isReadyForReview = Boolean(hasStadium || hasDocs);
+
+        return {
+          ...u,
+          linkedStadium: stadium,
+          hasStadium,
+          hasDocs,
+          isReadyForReview,
+          auditCategory: isReadyForReview ? 'ready' : 'incomplete',
+        };
       });
     } catch (e) {
       console.error('Error in fetchPendingOwners:', e);

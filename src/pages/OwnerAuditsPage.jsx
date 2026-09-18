@@ -21,13 +21,17 @@ import {
   Refresh2,
   Clock,
   ShieldTick,
+  InfoCircle,
+  Messages3,
 } from 'iconsax-react';
 
 export const OwnerAuditsPage = () => {
-  const { t } = useLanguage();
+  const { t, lang, isRTL } = useLanguage();
+  const isAr = lang === 'ar' || isRTL;
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [owners, setOwners] = useState([]);
+  const [activeSubTab, setActiveSubTab] = useState('ready'); // 'ready' | 'incomplete'
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [linkedStadium, setLinkedStadium] = useState(null);
 
@@ -55,14 +59,30 @@ export const OwnerAuditsPage = () => {
     setToast({ message, type });
   };
 
+  const readyOwners = owners.filter((o) => o.isReadyForReview);
+  const incompleteOwners = owners.filter((o) => !o.isReadyForReview);
+  const displayedOwners = activeSubTab === 'ready' ? readyOwners : incompleteOwners;
+
   const fetchPendingOwners = async () => {
     setLoading(true);
     try {
       const data = await adminService.fetchPendingOwners();
-      setOwners(data || []);
+      const allOwners = data || [];
+      setOwners(allOwners);
 
-      if (data && data.length > 0) {
-        selectOwnerItem(data[0]);
+      const curReady = allOwners.filter((o) => o.isReadyForReview);
+      const curIncomplete = allOwners.filter((o) => !o.isReadyForReview);
+
+      // Auto-switch to incomplete tab if ready is empty but incomplete has items
+      let targetTab = activeSubTab;
+      if (curReady.length === 0 && curIncomplete.length > 0 && activeSubTab === 'ready') {
+        setActiveSubTab('incomplete');
+        targetTab = 'incomplete';
+      }
+
+      const currentList = targetTab === 'ready' ? curReady : curIncomplete;
+      if (currentList.length > 0) {
+        selectOwnerItem(currentList[0]);
       } else {
         setSelectedOwner(null);
         setLinkedStadium(null);
@@ -76,17 +96,54 @@ export const OwnerAuditsPage = () => {
 
   const selectOwnerItem = async (owner) => {
     setSelectedOwner(owner);
-    const stadium = await adminService.fetchStadiumForOwner(owner.id);
-    setLinkedStadium(stadium);
+    if (owner.linkedStadium) {
+      setLinkedStadium(owner.linkedStadium);
+    } else {
+      const stadium = await adminService.fetchStadiumForOwner(owner.id);
+      setLinkedStadium(stadium);
+    }
+  };
+
+  const handleTabSwitch = (tab) => {
+    setActiveSubTab(tab);
+    const list = tab === 'ready' ? readyOwners : incompleteOwners;
+    if (list.length > 0) {
+      selectOwnerItem(list[0]);
+    } else {
+      setSelectedOwner(null);
+      setLinkedStadium(null);
+    }
   };
 
   useEffect(() => {
     fetchPendingOwners();
   }, []);
 
+  // WhatsApp Contact Direct Action
+  const handleWhatsAppContact = (phone, name) => {
+    if (!phone) return;
+    let clean = String(phone).replace(/[^0-9]/g, '');
+    if (clean.startsWith('01')) {
+      clean = '20' + clean.slice(1);
+    } else if (!clean.startsWith('20') && clean.length === 10) {
+      clean = '20' + clean;
+    }
+    const msg = encodeURIComponent(
+      isAr
+        ? `مرحباً أستاذ ${name || ''}، معك إدارة منصة VSP. بخصوص حسابك كصاحب ملعب والبدء في تسجيل ملعبك على المنصة...`
+        : `Hello ${name || ''}, this is VSP Platform Administration regarding your stadium onboarding...`
+    );
+    window.open(`https://wa.me/${clean}?text=${msg}`, '_blank');
+  };
+
   // Approve Owner
   const handleApprove = async () => {
     if (!selectedOwner) return;
+    if (!selectedOwner.isReadyForReview) {
+      showToast(t('cannot_approve_empty_owner'), 'warning');
+      return;
+    }
+
     setProcessing(true);
     try {
       const res = await adminService.approveOwner({
@@ -167,7 +224,8 @@ export const OwnerAuditsPage = () => {
 
   // Helper to extract docs
   const getOwnerDocuments = (owner) => {
-    const addData = owner?.additional_data || {};
+    if (!owner) return [];
+    const addData = owner.additional_data || {};
     const docs = addData.verificationDocuments || addData.documents || {};
     const list = [];
 
@@ -220,7 +278,7 @@ export const OwnerAuditsPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
-            <ShieldTick className="w-6 h-6 text-vsp-accent" variant="Outline" />
+            <ClipboardTick className="w-6 h-6 text-vsp-accent" variant="Outline" />
             <span>{t('owner_audits_title')}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-0.5">
@@ -228,11 +286,11 @@ export const OwnerAuditsPage = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={fetchPendingOwners}
             className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white rounded-xl transition-all"
-            title={t('refresh_data')}
+            title="Refresh"
           >
             <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
           </button>
@@ -264,73 +322,153 @@ export const OwnerAuditsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Owners List Column */}
           <div className="lg:col-span-5 space-y-3">
+            {/* Segmented Sub-Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-vsp-card/70 border border-vsp-border rounded-xl">
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('ready')}
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  activeSubTab === 'ready'
+                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>{t('tab_ready_audits')}</span>
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] rounded-full font-mono font-bold ${
+                    activeSubTab === 'ready'
+                      ? 'bg-vsp-accent/20 text-vsp-accent border border-vsp-accent/30'
+                      : 'bg-vsp-surface text-zinc-500'
+                  }`}
+                >
+                  {readyOwners.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('incomplete')}
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  activeSubTab === 'incomplete'
+                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>{t('tab_incomplete_onboarding')}</span>
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] rounded-full font-mono font-bold ${
+                    activeSubTab === 'incomplete'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-vsp-surface text-zinc-500'
+                  }`}
+                >
+                  {incompleteOwners.length}
+                </span>
+              </button>
+            </div>
+
+            {/* List header note */}
             <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-bold text-vsp-textSecondary">
-                {t('pending_requests_count')} ({owners.length})
+              <span className="text-[11px] font-bold text-vsp-textSecondary">
+                {activeSubTab === 'ready' ? t('tab_ready_audits') : t('tab_incomplete_onboarding')} (
+                {displayedOwners.length})
               </span>
-              <Badge variant="warning" size="xs">
-                {t('action_required')}
+              <Badge variant={activeSubTab === 'ready' ? 'warning' : 'default'} size="xs">
+                {activeSubTab === 'ready' ? t('action_required') : t('badge_draft_lead')}
               </Badge>
             </div>
 
-            <div className="space-y-2.5 max-h-[75vh] overflow-y-auto pr-1">
-              {owners.map((owner) => {
-                const isSelected = selectedOwner?.id === owner.id;
-                const docsCount = getOwnerDocuments(owner).length;
+            {displayedOwners.length === 0 ? (
+              <div className="p-8 bg-vsp-surface border border-vsp-border rounded-2xl text-center space-y-2">
+                <p className="text-xs font-bold text-white">
+                  {activeSubTab === 'ready'
+                    ? t('no_pending_audits_title')
+                    : t('no_incomplete_owners_title')}
+                </p>
+                <p className="text-[11px] text-vsp-textSecondary">
+                  {activeSubTab === 'ready'
+                    ? t('no_pending_audits_sub')
+                    : t('no_incomplete_owners_sub')}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[75vh] overflow-y-auto pr-1">
+                {displayedOwners.map((owner) => {
+                  const isSelected = selectedOwner?.id === owner.id;
+                  const docsCount = getOwnerDocuments(owner).length;
 
-                return (
-                  <div
-                    key={owner.id}
-                    onClick={() => selectOwnerItem(owner)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-vsp-card border-vsp-accent shadow-lg shadow-vsp-accent/5'
-                        : 'bg-vsp-surface border-vsp-border hover:border-zinc-700 hover:bg-vsp-card/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center font-bold text-white shrink-0 overflow-hidden">
-                        {owner.profile_image_url ? (
-                          <img
-                            src={owner.profile_image_url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          owner.name?.charAt(0) || 'M'
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-bold text-white truncate">
-                            {owner.name || '-'}
-                          </h4>
-                          <span className="text-[10px] text-zinc-500 font-mono">
-                            {owner.created_at
-                              ? new Date(owner.created_at).toLocaleDateString(t('lang_button') === 'English' ? 'ar-EG' : 'en-US')
-                              : ''}
-                          </span>
+                  return (
+                    <div
+                      key={owner.id}
+                      onClick={() => selectOwnerItem(owner)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-vsp-card border-vsp-accent shadow-lg shadow-vsp-accent/5'
+                          : 'bg-vsp-surface border-vsp-border hover:border-zinc-700 hover:bg-vsp-card/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center font-bold text-white shrink-0 overflow-hidden">
+                          {owner.profile_image_url ? (
+                            <img
+                              src={owner.profile_image_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            owner.name?.charAt(0) || 'M'
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-3 text-[11px] text-vsp-textSecondary mt-1">
-                          <span className="truncate">{owner.phone || '-'}</span>
-                          <span>•</span>
-                          <span className="text-zinc-400 font-semibold">{owner.governorate || '-'}</span>
-                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-white truncate">
+                              {owner.name || '-'}
+                            </h4>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {owner.created_at
+                                ? new Date(owner.created_at).toLocaleDateString(
+                                    t('lang_button') === 'English' ? 'ar-EG' : 'en-US'
+                                  )
+                                : ''}
+                            </span>
+                          </div>
 
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant={docsCount > 0 ? 'accent' : 'default'} size="xs">
-                            <DocumentText className="w-3 h-3" variant="Outline" />
-                            <span>{docsCount} {t('uploaded_documents') || 'Documents'}</span>
-                          </Badge>
+                          <div className="flex items-center gap-3 text-[11px] text-vsp-textSecondary mt-1">
+                            <span className="truncate">{owner.phone || '-'}</span>
+                            <span>•</span>
+                            <span className="text-zinc-400 font-semibold">{owner.governorate || '-'}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {owner.hasStadium ? (
+                              <Badge variant="accent" size="xs">
+                                <Building className="w-3 h-3 text-vsp-accent" variant="Outline" />
+                                <span>{owner.linkedStadium?.name || t('stadium_info')}</span>
+                              </Badge>
+                            ) : null}
+
+                            <Badge variant={docsCount > 0 ? 'success' : 'default'} size="xs">
+                              <DocumentText className="w-3 h-3" variant="Outline" />
+                              <span>
+                                {docsCount} {t('uploaded_documents') || 'Documents'}
+                              </span>
+                            </Badge>
+
+                            {!owner.isReadyForReview && (
+                              <Badge variant="warning" size="xs">
+                                <Clock className="w-3 h-3 text-amber-400" variant="Outline" />
+                                <span>{t('badge_draft_lead')}</span>
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Owner Details & Inspection Column */}
@@ -359,15 +497,35 @@ export const OwnerAuditsPage = () => {
                     </div>
                   </div>
 
-                  <Badge variant="warning" size="sm">
-                    <Clock className="w-3 h-3" variant="Outline" />
-                    <span>{t('pending')}</span>
-                  </Badge>
+                  {selectedOwner.isReadyForReview ? (
+                    <Badge variant="warning" size="sm">
+                      <Clock className="w-3 h-3" variant="Outline" />
+                      <span>{t('pending')}</span>
+                    </Badge>
+                  ) : (
+                    <Badge variant="warning" size="sm">
+                      <Clock className="w-3 h-3 text-amber-400" variant="Outline" />
+                      <span>{t('badge_draft_lead')}</span>
+                    </Badge>
+                  )}
                 </div>
+
+                {/* Incomplete Warning Banner if user has no stadium and no docs */}
+                {!selectedOwner.isReadyForReview && (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 shadow-sm">
+                    <InfoCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" variant="Outline" />
+                    <div className="space-y-0.5">
+                      <h5 className="text-xs font-bold text-amber-200">{t('incomplete_warning_title')}</h5>
+                      <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                        {t('incomplete_warning_desc')}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Contact & Location Info */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-vsp-card/60 border border-vsp-border rounded-xl p-3.5 space-y-1">
+                  <div className="bg-vsp-card/60 border border-vsp-border rounded-xl p-3.5 space-y-2">
                     <span className="text-[11px] text-vsp-textSecondary font-semibold">{t('owner_info')}</span>
                     <div className="flex items-center gap-2 text-xs text-white font-bold">
                       <Call className="w-3.5 h-3.5 text-zinc-400" variant="Outline" />
@@ -377,6 +535,28 @@ export const OwnerAuditsPage = () => {
                       <Sms className="w-3.5 h-3.5" variant="Outline" />
                       <span className="truncate">{selectedOwner.email || '-'}</span>
                     </div>
+
+                    {/* Direct Contact Actions */}
+                    {selectedOwner.phone && (
+                      <div className="flex items-center gap-2 pt-1 border-t border-vsp-border/50">
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppContact(selectedOwner.phone, selectedOwner.name)}
+                          className="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-[11px] rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Messages3 className="w-3.5 h-3.5" variant="Outline" />
+                          <span>{t('whatsapp_contact')}</span>
+                        </button>
+
+                        <a
+                          href={`tel:${selectedOwner.phone}`}
+                          className="px-2.5 py-1 bg-vsp-surface hover:bg-zinc-800 border border-vsp-border text-zinc-300 font-bold text-[11px] rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Call className="w-3.5 h-3.5" variant="Outline" />
+                          <span>{t('call_owner')}</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-vsp-card/60 border border-vsp-border rounded-xl p-3.5 space-y-1">
@@ -400,11 +580,11 @@ export const OwnerAuditsPage = () => {
                     </h4>
                     {linkedStadium ? (
                       <Badge variant="accent" size="xs">
-                        {t('registered_stadiums')}
+                        {t('registered_stadiums') || 'Registered'}
                       </Badge>
                     ) : (
                       <Badge variant="default" size="xs">
-                        {t('no_data')}
+                        {t('no_stadium_yet_title')}
                       </Badge>
                     )}
                   </div>
@@ -417,17 +597,27 @@ export const OwnerAuditsPage = () => {
                       </div>
                       <div>
                         <span className="text-vsp-textSecondary text-[11px]">{t('price_per_hour_label')}:</span>
-                        <p className="font-bold text-white">{linkedStadium.price_per_hour || 0} {t('currency')}</p>
+                        <p className="font-bold text-white">
+                          {linkedStadium.price_per_hour || 0} {t('currency')}
+                        </p>
                       </div>
                       <div>
                         <span className="text-vsp-textSecondary text-[11px]">{t('governorate')}:</span>
-                        <p className="font-bold text-white">{linkedStadium.city || linkedStadium.governorate || '-'}</p>
+                        <p className="font-bold text-white">
+                          {linkedStadium.city || linkedStadium.governorate || '-'}
+                        </p>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-vsp-textSecondary">
-                      {t('no_data')}
-                    </p>
+                    <div className="p-4 bg-vsp-surface/60 border border-dashed border-vsp-border rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-500 shrink-0">
+                        <Building className="w-5 h-5" variant="Outline" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-zinc-200">{t('no_stadium_yet_title')}</p>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">{t('no_stadium_yet_desc')}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -439,8 +629,14 @@ export const OwnerAuditsPage = () => {
                   </h4>
 
                   {getOwnerDocuments(selectedOwner).length === 0 ? (
-                    <div className="p-4 bg-vsp-card/40 border border-vsp-border rounded-xl text-center text-xs text-vsp-textSecondary">
-                      {t('no_data')}
+                    <div className="p-4 bg-vsp-surface/60 border border-dashed border-vsp-border rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-500 shrink-0">
+                        <DocumentText className="w-5 h-5" variant="Outline" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-zinc-200">{t('no_docs_yet_title')}</p>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">{t('no_docs_yet_desc')}</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -451,9 +647,7 @@ export const OwnerAuditsPage = () => {
                         >
                           <div className="flex items-center gap-2.5 truncate">
                             <DocumentText className="w-4 h-4 text-zinc-400 shrink-0" variant="Outline" />
-                            <span className="text-xs font-semibold text-white truncate">
-                              {doc.label}
-                            </span>
+                            <span className="text-xs font-semibold text-white truncate">{doc.label}</span>
                           </div>
                           <button
                             onClick={() =>
@@ -477,18 +671,30 @@ export const OwnerAuditsPage = () => {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-vsp-border">
-                  <button
-                    onClick={handleApprove}
-                    disabled={processing}
-                    className="w-full sm:flex-1 py-3 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {processing ? (
-                      <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
-                    ) : (
-                      <TickCircle className="w-4 h-4" variant="Outline" />
+                  <div className="w-full sm:flex-1 space-y-1">
+                    <button
+                      onClick={handleApprove}
+                      disabled={processing || !selectedOwner.isReadyForReview}
+                      title={!selectedOwner.isReadyForReview ? t('cannot_approve_empty_owner') : ''}
+                      className={`w-full py-3 font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
+                        selectedOwner.isReadyForReview
+                          ? 'bg-zinc-100 hover:bg-white text-black cursor-pointer'
+                          : 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      {processing ? (
+                        <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
+                      ) : (
+                        <TickCircle className="w-4 h-4" variant="Outline" />
+                      )}
+                      <span>{t('approve_owner_btn')}</span>
+                    </button>
+                    {!selectedOwner.isReadyForReview && (
+                      <p className="text-[10px] text-center text-zinc-500 font-semibold">
+                        {t('cannot_approve_empty_owner')}
+                      </p>
                     )}
-                    <span>{t('approve_owner_btn')}</span>
-                  </button>
+                  </div>
 
                   <button
                     onClick={() => setShowRejectModal(true)}
@@ -522,7 +728,9 @@ export const OwnerAuditsPage = () => {
       >
         <div className="space-y-4">
           <p className="text-xs text-vsp-textSecondary">
-            {t('reject_reason_prompt')}
+            {selectedOwner && !selectedOwner.isReadyForReview
+              ? t('incomplete_warning_desc')
+              : t('reject_reason_prompt')}
           </p>
           <textarea
             value={rejectReason}
@@ -558,7 +766,9 @@ export const OwnerAuditsPage = () => {
       >
         <form onSubmit={handleManualCreate} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-vsp-textSecondary mb-1">{t('owner_name_label')}</label>
+            <label className="block text-[11px] font-bold text-vsp-textSecondary mb-1">
+              {t('owner_name_label')}
+            </label>
             <input
               type="text"
               required
@@ -594,7 +804,9 @@ export const OwnerAuditsPage = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-vsp-textSecondary mb-1">{t('stadium_name_label')}</label>
+            <label className="block text-[11px] font-bold text-vsp-textSecondary mb-1">
+              {t('stadium_name_label')}
+            </label>
             <input
               type="text"
               required
@@ -618,7 +830,9 @@ export const OwnerAuditsPage = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-vsp-textSecondary mb-1">{t('price_per_hour_label')}</label>
+              <label className="block text-[11px] font-bold text-vsp-textSecondary mb-1">
+                {t('price_per_hour_label')}
+              </label>
               <input
                 type="number"
                 value={manualForm.pricePerHour}
