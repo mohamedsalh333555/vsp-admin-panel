@@ -335,43 +335,21 @@ class AdminService {
 
   async approveOwner({ ownerId, stadiumId }) {
     try {
-      // 1. Try atomic procedure if available
-      try {
-        const { data: rpcRes, error: rpcErr } = await this.client.rpc('admin_approve_owner_atomic', {
-          p_owner_id: ownerId,
-          p_stadium_id: stadiumId || null,
-        });
-        if (!rpcErr) return { success: true, data: rpcRes };
-      } catch (_) {}
+      // 🔒 Strict Security: Atomic RPC only, no direct table fallback
+      const { data, error } = await this.client.rpc('admin_approve_owner_atomic', {
+        p_owner_id: ownerId,
+      });
 
-      // 2. Direct updates fallback with verified schema columns
-      const { error: userErr } = await this.client
-        .from('users')
-        .update({
-          role: 'owner',
-          verification_status: 'approved',
-          is_identity_verified: true,
-          has_stadium: true,
-          is_blocked: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ownerId);
-
-      if (userErr) throw userErr;
-
-      if (stadiumId) {
-        await this.client
-          .from('stadiums')
-          .update({ is_verified: true, is_blocked: false, updated_at: new Date().toISOString() })
-          .eq('id', stadiumId);
+      if (error) {
+        console.error('[AdminService] admin_approve_owner_atomic failed:', error);
+        throw new Error(`فشل توثيق المالك: ${error.message}`);
       }
 
-      await this.client
-        .from('stadiums')
-        .update({ is_verified: true, is_blocked: false, updated_at: new Date().toISOString() })
-        .eq('owner_id', ownerId);
+      if (data && data.success === false) {
+        throw new Error(`فشل توثيق المالك: ${data.error || 'خطأ غير معروف'}`);
+      }
 
-      return { success: true };
+      return { success: true, data };
     } catch (e) {
       console.error('Error in approveOwner:', e);
       const err = classifyError(e);
@@ -586,41 +564,22 @@ class AdminService {
 
   async toggleUserBlockStatus(userId, isBlocked) {
     try {
-      // 1. Try atomic admin procedure
-      try {
-        const { data: rpcData, error: rpcError } = await this.client.rpc('admin_toggle_user_block', {
-          p_user_id: userId,
-          p_is_blocked: isBlocked,
-        });
-        if (!rpcError && rpcData?.success) {
-          return { success: true };
-        }
-      } catch (_) {}
+      // 🔒 Strict Security: Atomic RPC only, no direct table fallback
+      const { data, error } = await this.client.rpc('admin_toggle_user_block', {
+        p_user_id: userId,
+        p_is_blocked: isBlocked,
+      });
 
-      // 2. Direct update fallback
-      const { data, error } = await this.client
-        .from('users')
-        .update({
-          is_blocked: isBlocked,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId)
-        .select();
-
-      // 3. Cascade block/unblock to owned stadiums to protect players from booking at banned venues
-      try {
-        await this.client
-          .from('stadiums')
-          .update({
-            is_blocked: isBlocked,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('owner_id', userId);
-      } catch (stadiumErr) {
-        console.warn('Could not cascade block to stadiums:', stadiumErr);
+      if (error) {
+        console.error('[AdminService] admin_toggle_user_block failed:', error);
+        throw new Error(`فشل تحديث حالة الحظر: ${error.message}`);
       }
 
-      return { success: true };
+      if (data && data.success === false) {
+        throw new Error(`فشل تحديث حالة الحظر: ${data.error || 'خطأ غير معروف'}`);
+      }
+
+      return { success: true, data };
     } catch (e) {
       console.error('Error in toggleUserBlockStatus:', e);
       const err = classifyError(e);
@@ -656,16 +615,17 @@ class AdminService {
         return { success: false, error: 'لا يمكن حذف حساب مؤسس شريك محمي نهائياً' };
       }
 
-      try {
-        const { data, error } = await this.client.rpc('delete_user_permanently', {
-          p_user_id: userId,
-        });
-        if (!error) return { success: true, data };
-      } catch (_) {}
+      // 🔒 Strict Security: Atomic RPC only, no direct delete fallback
+      const { data, error } = await this.client.rpc('delete_user_permanently', {
+        p_user_id: userId,
+      });
 
-      const { error } = await this.client.from('users').delete().eq('id', userId);
-      if (error) throw error;
-      return { success: true };
+      if (error) {
+        console.error('[AdminService] delete_user_permanently failed:', error);
+        throw new Error(`فشل حذف المستخدم: ${error.message}`);
+      }
+
+      return { success: true, data };
     } catch (e) {
       console.error('Error in deleteUserPermanently:', e);
       const err = classifyError(e);
@@ -841,35 +801,22 @@ class AdminService {
     awayScore = null,
   }) {
     try {
-      // 1. Try atomic RPC
-      try {
-        const { data, error } = await this.client.rpc('admin_resolve_dispute_atomic', {
-          p_booking_id: bookingId,
-          p_outcome: winnerOutcome,
-          p_notes: resolutionNotes,
-        });
-        if (!error) return { success: true, data };
-      } catch (_) {}
+      // 🔒 Strict Security: Atomic RPC only, no direct table fallback
+      const { data, error } = await this.client.rpc('admin_resolve_dispute_atomic', {
+        p_booking_id: bookingId,
+        p_final_outcome: winnerOutcome,
+      });
 
-      // 2. Direct resolution update fallback
-      const payload = {
-        status: winnerOutcome === 'cancelled' ? 'cancelled' : 'completed',
-        match_result_status: 'confirmed',
-        final_outcome: winnerOutcome,
-        pending_outcome: null,
-        requires_admin_intervention: false,
-        dispute_resolution: resolutionNotes || `Resolved as ${winnerOutcome} by Admin`,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (homeScore !== null && awayScore !== null) {
-        payload.home_team_score = Number(homeScore);
-        payload.away_team_score = Number(awayScore);
+      if (error) {
+        console.error('[AdminService] admin_resolve_dispute_atomic failed:', error);
+        throw new Error(`فشل فض النزاع: ${error.message}`);
       }
 
-      const { error } = await this.client.from('bookings').update(payload).eq('id', bookingId);
-      if (error) throw error;
-      return { success: true };
+      if (data && data.success === false) {
+        throw new Error(`فشل فض النزاع: ${data.message || data.error || 'خطأ غير معروف'}`);
+      }
+
+      return { success: true, data };
     } catch (e) {
       console.error('Error in resolveDispute:', e);
       const err = classifyError(e);
@@ -1681,21 +1628,26 @@ class AdminService {
     try {
       const refNumber = transactionId || `TXN_${Date.now()}`;
 
-      // 1. Try atomic procedure to record transaction & push notification
-      try {
-        await this.client.rpc('admin_record_payout_settlement_atomic', {
-          p_owner_id: ownerId,
-          p_amount: Number(amount),
-          p_payment_method: method,
-          p_reference: refNumber,
-        });
-      } catch (rpcErr) {
-        console.warn('Atomic RPC payout warning:', rpcErr);
+      // 🔒 Strict Security: Atomic RPC only, no direct transaction insertion fallback
+      const { data, error: rpcErr } = await this.client.rpc('admin_record_payout_settlement_atomic', {
+        p_owner_id: ownerId,
+        p_amount: Number(amount),
+        p_payment_method: method,
+        p_reference: refNumber,
+      });
+
+      if (rpcErr) {
+        console.error('[AdminService] admin_record_payout_settlement_atomic failed:', rpcErr);
+        throw new Error(`فشلت تسوية أرباح المالك: ${rpcErr.message}`);
       }
 
-      // 2. Update payout_settlements record
+      if (data && data.success === false) {
+        throw new Error(`فشلت تسوية أرباح المالك: ${data.error || 'خطأ غير معروف'}`);
+      }
+
+      // Update payout_settlements record
       if (settlementId) {
-        const { error } = await this.client
+        const { error: updateErr } = await this.client
           .from('payout_settlements')
           .update({
             status: 'paid',
@@ -1704,10 +1656,12 @@ class AdminService {
           })
           .eq('id', settlementId);
 
-        if (error) throw error;
+        if (updateErr) {
+          console.warn('[AdminService] Could not update payout_settlements record status:', updateErr);
+        }
       }
 
-      return { success: true };
+      return { success: true, data };
     } catch (e) {
       console.error('Error in recordPayoutSettlement:', e);
       const err = classifyError(e);
