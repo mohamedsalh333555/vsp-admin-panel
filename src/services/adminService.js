@@ -416,7 +416,24 @@ class AdminService {
 
   async activateVspPro({ ownerId, days = 30 }) {
     try {
-      // 1. Check existing subscription to support cumulative extension
+      // 1. Try atomic admin RPC (bypasses sensitive field trigger restrictions safely)
+      try {
+        const { data: rpcData, error: rpcErr } = await this.client.rpc('admin_set_owner_subscription_atomic', {
+          p_owner_id: ownerId,
+          p_plan: 'pro',
+          p_days: Number(days) || 30,
+        });
+        if (!rpcErr && rpcData?.success) {
+          return { success: true, expiresAt: rpcData.subscription_expires_at };
+        }
+        if (rpcErr) {
+          console.warn('admin_set_owner_subscription_atomic notice, attempting fallback:', rpcErr.message);
+        }
+      } catch (err) {
+        console.warn('RPC call exception, attempting fallback:', err);
+      }
+
+      // 2. Fallback: Cumulative extension calculation with direct update
       let baseTime = Date.now();
       try {
         const { data: currentUser } = await this.client
@@ -438,7 +455,7 @@ class AdminService {
 
       const expiresAt = new Date(baseTime + Number(days) * 24 * 60 * 60 * 1000).toISOString();
 
-      // 2. Update user record
+      // Update user record
       const { error: updateErr } = await this.client
         .from('users')
         .update({
@@ -459,6 +476,21 @@ class AdminService {
 
   async downgradeOwnerToBasic({ ownerId }) {
     try {
+      // 1. Try atomic admin RPC
+      try {
+        const { data: rpcData, error: rpcErr } = await this.client.rpc('admin_set_owner_subscription_atomic', {
+          p_owner_id: ownerId,
+          p_plan: 'free_trial',
+          p_days: 0,
+        });
+        if (!rpcErr && rpcData?.success) {
+          return { success: true };
+        }
+      } catch (err) {
+        console.warn('RPC call exception, attempting fallback:', err);
+      }
+
+      // 2. Fallback direct update
       const { error } = await this.client
         .from('users')
         .update({
