@@ -718,6 +718,8 @@ export const OwnerAuditsPage = () => {
         title={activeDoc.title}
         imageUrl={activeDoc.url}
         isPdf={activeDoc.isPdf}
+        ownerPhone={selectedOwner?.phone}
+        ownerName={selectedOwner?.name}
       />
 
       {/* Reject Modal */}
