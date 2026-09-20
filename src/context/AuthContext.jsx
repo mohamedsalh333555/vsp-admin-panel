@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, supabaseAdmin } from '../lib/supabase';
 
 const AuthContext = createContext();
@@ -106,6 +106,38 @@ export const AuthProvider = ({ children }) => {
       }
       throw error;
     }
+
+    // فحص الصلاحية الإدارية فوراً لمنع تعليق الحسابات العادية
+    try {
+      const isCoFounderEmail = COFOUNDER_EMAILS.includes(normalizedEmail);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, email, role, is_blocked, verification_status')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (userData?.is_blocked) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        throw new Error('تم حظر أو إيقاف هذا الحساب الإداري. يرجى مراجعة إدارة المنظومة.');
+      }
+
+      const isCoFounder = isCoFounderEmail || userData?.role === 'cofounder' || userData?.role === 'co_founder';
+      const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(userData?.role?.toLowerCase());
+      const isApprovedAdmin = isCoFounder || (isAdminRole && userData?.verification_status === 'approved');
+
+      if (!isApprovedAdmin) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        throw new Error('عفواً، هذا الحساب ليس لديه صلاحيات إدارية. الدخول مخصص لمسؤولي المنظومة فقط، يرجى استخدام تطبيق الموبايل.');
+      }
+    } catch (err) {
+      setLoading(false);
+      throw err;
+    }
+
     return data;
   };
 
