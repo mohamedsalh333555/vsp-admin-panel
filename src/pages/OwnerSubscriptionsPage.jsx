@@ -77,7 +77,7 @@ export const OwnerSubscriptionsPage = () => {
 
   /**
    * Evaluates subscription tier, expiration, remaining days, and stadium capacity.
-   * Basic accounts have a 2-month free trial from account creation.
+   * Basic accounts have a 1-year free trial from account creation.
    */
   const getOwnerSubscriptionDetails = (owner) => {
     const isPro = owner.subscription_plan === 'pro';
@@ -109,12 +109,12 @@ export const OwnerSubscriptionsPage = () => {
       };
     }
 
-    // Free Trial: respects trial_ends_at if stored, or 2 calendar months from created_at
+    // Free Trial: respects trial_ends_at if stored, or 1 calendar year from created_at
     const trialExpiresAt = owner.trial_ends_at
       ? new Date(owner.trial_ends_at)
       : new Date(
-          createdAt.getFullYear(),
-          createdAt.getMonth() + 2,
+          createdAt.getFullYear() + 1,
+          createdAt.getMonth(),
           createdAt.getDate()
         );
     const diffDays = getCalendarDaysDifference(trialExpiresAt);
