@@ -1,16 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const DEFAULT_PROJECT_URL = 'https://mktqkddbcddrxjxabdua.supabase.co';
-const VERIFIED_ANON_KEY = 'sb_publishable_ht3eLKZoEiQ49hh413Yfgw_E-S4k3-k';
-
 const envUrl = import.meta.env.VITE_SUPABASE_URL;
 const envAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const SUPABASE_URL = (envUrl && envUrl.includes('supabase.co')) ? envUrl : DEFAULT_PROJECT_URL;
-// تجنب المفتاح المعطوب أو غير المسجل المسجل في Vercel واستخدام المفتاح الفعّال فوراً
-export const SUPABASE_ANON_KEY = (envAnonKey && envAnonKey.length > 20 && !envAnonKey.includes('I6UoUL32GmnFZcXQ5ioasA')) 
-  ? envAnonKey 
-  : VERIFIED_ANON_KEY;
+if (!envUrl || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(envUrl)) {
+  throw new Error('VITE_SUPABASE_URL is required and must be the official Supabase project URL.');
+}
+if (!envAnonKey || envAnonKey.length < 20) {
+  throw new Error('VITE_SUPABASE_ANON_KEY is required.');
+}
+
+export const SUPABASE_URL = envUrl;
+export const SUPABASE_ANON_KEY = envAnonKey;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -19,6 +20,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
-// Admin client strictly uses the authenticated admin user's session with RLS and SECURITY DEFINER RPCs (no service_role key exposed on client)
+// The admin panel uses the authenticated admin session.
+// No service_role secret is shipped to the browser.
 export const supabaseAdmin = supabase;
-
