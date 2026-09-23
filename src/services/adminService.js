@@ -102,49 +102,16 @@ class AdminService {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error) {
-        console.warn('Booking join warning, falling back to batch lookup:', error.message);
-        const fallback = await this.client
-          .from('bookings')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        const rawBookings = fallback.data || [];
-        if (rawBookings.length === 0) return [];
-
-        // Manually hydrate user profiles & stadium details so player name is NEVER missing
-        const userIds = [...new Set(rawBookings.map((b) => b.created_by_user_id || b.user_id).filter(Boolean))];
-        const stadiumIds = [...new Set(rawBookings.map((b) => b.stadium_id).filter(Boolean))];
-
-        const [usersMapRes, stadiumsMapRes] = await Promise.all([
-          userIds.length > 0 ? this.client.from('users').select('id, name, phone, email').in('id', userIds) : { data: [] },
-          stadiumIds.length > 0 ? this.client.from('stadiums').select('id, name, governorate').in('id', stadiumIds) : { data: [] },
-        ]);
-
-        const userMap = new Map((usersMapRes.data || []).map((u) => [u.id, u]));
-        const stadiumMap = new Map((stadiumsMapRes.data || []).map((s) => [s.id, s]));
-
-        return rawBookings.map((b) => ({
-          ...b,
-          users: userMap.get(b.created_by_user_id || b.user_id) || null,
-          player: userMap.get(b.created_by_user_id || b.user_id) || null,
-          stadiums: stadiumMap.get(b.stadium_id) || b.stadiums || null,
-        }));
-      }
-
+      if (error) throw error;
       return (data || []).map((b) => ({
         ...b,
         users: b.player || b.users || null,
       }));
     } catch (e) {
       console.error('Error fetching recent bookings:', e);
-      return [];
+      throw e;
     }
   }
-
-  
-  // تأكيد تحصيل الحجز كاش بصورة ذرية وتأمين وسيلة الدفع cash
   async confirmCashBooking(bookingId, ownerId, totalPrice, collectedAmount = null) {
     try {
       const { data, error } = await this.client.rpc('confirm_cash_booking_atomic', {
@@ -164,80 +131,51 @@ class AdminService {
 
   async updateBookingDetails(bookingId, updates) {
     try {
-      const payload = {
-        ...updates,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await this.client
-        .from('bookings')
-        .update(payload)
-        .eq('id', bookingId);
-
+      const { data, error } = await this.client.rpc('admin_update_booking_safe_atomic', {
+        p_booking_id: bookingId,
+        p_updates: updates || {},
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث بيانات الحجز');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in updateBookingDetails:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async cancelBookingWithReason(bookingId, reason) {
     try {
-      const { error } = await this.client
-        .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancellation_reason: reason || 'Cancelled by Admin',
-          cancelled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', bookingId);
-
+      const { data, error } = await this.client.rpc('admin_cancel_booking_atomic', {
+        p_booking_id: bookingId,
+        p_reason: reason || 'Cancelled by Admin',
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل إلغاء الحجز');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in cancelBookingWithReason:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async deleteBookingPermanently(bookingId) {
     try {
-      const { error } = await this.client
-        .from('bookings')
-        .delete()
-        .eq('id', bookingId);
-
-      if (error) {
-        // إذا تعذر الحذف الجسدي بسبب ارتباطات المفاتيح الأجنبية، نؤرشف الحجز كملغي حفاظاً على سلامة البيانات
-        console.warn('Direct delete blocked by foreign key, falling back to archive:', error.message);
-        const { error: cancelErr } = await this.client
-          .from('bookings')
-          .update({
-            status: 'cancelled',
-            cancellation_reason: 'تم حذف الحجز وأرشفته من قِبل إدارة المنظومة',
-            cancelled_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', bookingId);
-
-        if (cancelErr) throw cancelErr;
-        return { success: true, archived: true };
-      }
-      return { success: true };
+      // Financial booking rows are never physically deleted. Archive through the same
+      // server-authoritative cancellation/refund path to preserve ledger integrity.
+      const { data, error } = await this.client.rpc('admin_cancel_booking_atomic', {
+        p_booking_id: bookingId,
+        p_reason: 'تم أرشفة الحجز من قبل إدارة المنظومة',
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل أرشفة الحجز');
+      return { success: true, archived: true, data };
     } catch (e) {
       console.error('Error in deleteBookingPermanently:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-  // =========================================================================
-  // MODULE B: OWNER AUDITS & ONBOARDING
-  // =========================================================================
   async fetchPendingOwners() {
     try {
       const [usersRes, unverifiedStadiumsRes, allStadiumsRes] = await Promise.all([
@@ -257,6 +195,8 @@ class AdminService {
       ]);
 
       if (usersRes.error) throw usersRes.error;
+      if (unverifiedStadiumsRes.error) throw unverifiedStadiumsRes.error;
+      if (allStadiumsRes.error) throw allStadiumsRes.error;
 
       const unverifiedOwnerIds = new Set((unverifiedStadiumsRes.data || []).map((s) => s.owner_id));
       const stadiumsByOwner = new Map();
@@ -328,14 +268,13 @@ class AdminService {
         .select('*')
         .eq('owner_id', ownerId)
         .maybeSingle();
-
       if (error) throw error;
       return data;
     } catch (e) {
-      return null;
+      console.error('Error fetching stadium for owner:', e);
+      throw e;
     }
   }
-
   async approveOwner({ ownerId, stadiumId }) {
     try {
       // 🔒 Strict Security: Atomic RPC only, no direct table fallback
@@ -362,24 +301,19 @@ class AdminService {
 
   async rejectOwner({ ownerId, reason }) {
     try {
-      const { error } = await this.client
-        .from('users')
-        .update({
-          verification_status: 'rejected',
-          last_warning: reason,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ownerId);
-
+      const { data, error } = await this.client.rpc('admin_reject_owner_atomic', {
+        p_owner_id: ownerId,
+        p_reason: reason || null,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل رفض المالك');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in rejectOwner:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async fetchOwnersWithSubscriptions({ searchQuery = '' } = {}) {
     try {
       let query = this.client
@@ -398,25 +332,20 @@ class AdminService {
         query,
         this.client.from('stadiums').select('id, owner_id, name'),
       ]);
-
       if (usersRes.error) throw usersRes.error;
+      if (stadiumsRes.error) throw stadiumsRes.error;
+
       const owners = usersRes.data || [];
       const stadiums = stadiumsRes.data || [];
-
       return owners.map((owner) => {
-        const ownerStadiums = stadiums.filter((s) => s.owner_id === owner.id);
-        return {
-          ...owner,
-          stadiumCount: ownerStadiums.length,
-          stadiumNames: ownerStadiums.map((s) => s.name),
-        };
+        const ownerStadiums = stadiums.filter((st) => st.owner_id === owner.id);
+        return { ...owner, stadiumCount: ownerStadiums.length, stadiumNames: ownerStadiums.map((st) => st.name) };
       });
     } catch (e) {
       console.error('Error in fetchOwnersWithSubscriptions:', e);
-      return [];
+      throw e;
     }
   }
-
   async activateVspPro({ ownerId, days = 30 }) {
     try {
       const { data, error } = await this.client.rpc('admin_set_owner_subscription_atomic', {
@@ -455,61 +384,37 @@ class AdminService {
     phone,
     email,
     stadiumName,
-    governorate = 'القاهرة',
-    pricePerHour = 350,
+    governorate,
+    pricePerHour,
   }) {
     try {
-      // 1. Insert user
-      const { data: userRes, error: userErr } = await this.client
-        .from('users')
-        .insert({
-          name,
-          phone,
-          email,
-          role: 'owner',
-          verification_status: 'approved',
-          is_identity_verified: true,
-          governorate,
-          is_blocked: false,
-        })
-        .select()
-        .single();
-
-      if (userErr) throw userErr;
-
-      // 2. Insert stadium
-      const { error: stadiumErr } = await this.client
-        .from('stadiums')
-        .insert({
-          owner_id: userRes.id,
-          name: stadiumName,
-          governorate,
-          price_per_hour: Number(pricePerHour),
-          is_verified: true,
-          is_blocked: false,
-        });
-
-      if (stadiumErr) throw stadiumErr;
-      return { success: true, user: userRes };
+      if (!governorate || !pricePerHour) {
+        throw new Error('بيانات المحافظة وسعر الساعة مطلوبة');
+      }
+      const { data, error } = await this.client.rpc('admin_create_owner_with_stadium_atomic', {
+        p_name: name,
+        p_phone: phone,
+        p_email: email || null,
+        p_stadium_name: stadiumName,
+        p_governorate: governorate,
+        p_price_per_hour: Number(pricePerHour),
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل إنشاء المالك والملعب');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in createOwnerAndStadiumManually:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-  // =========================================================================
-  // MODULE C: USERS & MODERATION
-  // =========================================================================
   async fetchAllUsers({ searchQuery = '', roleFilter = 'all', statusFilter = 'all' }) {
     try {
       let query = this.client.from('users').select('*').order('created_at', { ascending: false });
-
       if (searchQuery.trim()) {
         const q = searchQuery.trim();
         query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
       }
-
       if (roleFilter !== 'all') {
         if (roleFilter === 'owner') {
           query = query.or('role.eq.owner,has_stadium.eq.true').not('role', 'in', '("admin","super_admin","co_founder","cofounder")');
@@ -519,62 +424,25 @@ class AdminService {
           query = query.eq('role', roleFilter);
         }
       }
-
-      if (statusFilter === 'blocked') {
-        query = query.eq('is_blocked', true);
-      } else if (statusFilter === 'active') {
-        query = query.or('is_blocked.eq.false,is_blocked.is.null');
-      }
+      if (statusFilter === 'blocked') query = query.eq('is_blocked', true);
+      else if (statusFilter === 'active') query = query.or('is_blocked.eq.false,is_blocked.is.null');
 
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
     } catch (e) {
       console.error('Error in fetchAllUsers:', e);
-      return [];
+      throw e;
     }
   }
-
   async toggleUserBlockStatus(userId, isBlocked) {
     try {
-      if (isBlocked) {
-        // 🔒 حماية سيادية: منع حظر حسابات المؤسسين الشركاء أو مسؤولي المنظومة برمجياً
-        const { data: targetUser } = await this.client
-          .from('users')
-          .select('email, role')
-          .eq('id', userId)
-          .maybeSingle();
-
-        const COFOUNDER_EMAILS = [
-          'mohamedsalh333555@gmail.com',
-          'admin@vsp.com',
-          'coo@vsp.com',
-          'hana.ramadan@vsp.com',
-          'ceo@vsp.com',
-        ];
-
-        const email = (targetUser?.email || '').toLowerCase().trim();
-        const role = (targetUser?.role || '').toLowerCase();
-        if (COFOUNDER_EMAILS.includes(email) || ['cofounder', 'co_founder', 'super_admin'].includes(role)) {
-          return { success: false, error: 'لا يمكن حظر هذا الحساب (حساب محمي للمؤسسين الشركاء أو إدارة المنظومة العليا)' };
-        }
-      }
-
-      // 🔒 Strict Security: Atomic RPC only, no direct table fallback
       const { data, error } = await this.client.rpc('admin_toggle_user_block', {
         p_user_id: userId,
         p_is_blocked: isBlocked,
       });
-
-      if (error) {
-        console.error('[AdminService] admin_toggle_user_block failed:', error);
-        throw new Error(`فشل تحديث حالة الحظر: ${error.message}`);
-      }
-
-      if (data && data.success === false) {
-        throw new Error(`فشل تحديث حالة الحظر: ${data.error || 'خطأ غير معروف'}`);
-      }
-
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث حالة الحظر');
       return { success: true, data };
     } catch (e) {
       console.error('Error in toggleUserBlockStatus:', e);
@@ -582,45 +450,25 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async resetNoShowCount(userId) {
     try {
-      const { error } = await this.client
-        .from('users')
-        .update({
-          no_show_count: 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
-
+      const { data, error } = await this.client.rpc('admin_reset_no_show_count_atomic', {
+        p_user_id: userId,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تصفير سجل عدم الحضور');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in resetNoShowCount:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async deleteUserPermanently(userId) {
     try {
-      // Logic Guard: Never delete co-founder accounts
-      const { data: targetUser } = await this.client.from('users').select('email, role').eq('id', userId).maybeSingle();
-      const COFOUNDER_EMAILS = ['mohamedsalh333555@gmail.com', 'admin@vsp.com', 'hana.ramadan@vsp.com', 'ceo@vsp.com'];
-      if (targetUser && (COFOUNDER_EMAILS.includes((targetUser.email || '').toLowerCase()) || ['co_founder', 'cofounder'].includes(targetUser.role))) {
-        return { success: false, error: 'لا يمكن حذف حساب مؤسس شريك محمي نهائياً' };
-      }
-
-      // 🔒 Strict Security: Atomic RPC only, no direct delete fallback
-      const { data, error } = await this.client.rpc('delete_user_permanently', {
-        p_user_id: userId,
-      });
-
-      if (error) {
-        console.error('[AdminService] delete_user_permanently failed:', error);
-        throw new Error(`فشل حذف المستخدم: ${error.message}`);
-      }
-
+      const { data, error } = await this.client.rpc('delete_user_permanently', { p_user_id: userId });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || data?.error || 'فشل حذف الحساب');
       return { success: true, data };
     } catch (e) {
       console.error('Error in deleteUserPermanently:', e);
@@ -628,65 +476,49 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async approveAdminUser(userId) {
     try {
-      const { error } = await this.client
-        .from('users')
-        .update({
-          role: 'admin',
-          is_blocked: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
-
+      const { data, error } = await this.client.rpc('admin_set_admin_role_atomic', {
+        p_user_id: userId,
+        p_role: 'admin',
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل منح الصلاحية الإدارية');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in approveAdminUser:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-  // =========================================================================
-  // MODULE D: TOURNAMENT CONTROL ROOM
-  // =========================================================================
   async fetchChampionships() {
     try {
       const { data, error } = await this.client
         .from('championships')
         .select('*')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       return data || [];
     } catch (e) {
       console.error('Error in fetchChampionships:', e);
-      return [];
+      throw e;
     }
   }
-
   async updateChampionshipStatus(id, status) {
     try {
-      const { error } = await this.client
-        .from('championships')
-        .update({
-          status,
-          is_approved: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
+      const { data, error } = await this.client.rpc('admin_update_championship_status_atomic', {
+        p_championship_id: id,
+        p_status: status,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث حالة البطولة');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in updateChampionshipStatus:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async fetchTournamentMatches(championshipId) {
     try {
       const { data, error } = await this.client
@@ -695,15 +527,13 @@ class AdminService {
         .eq('championship_id', championshipId)
         .order('round_index', { ascending: true })
         .order('match_index', { ascending: true });
-
       if (error) throw error;
       return data || [];
     } catch (e) {
       console.error('Error fetching tournament matches:', e);
-      return [];
+      throw e;
     }
   }
-
   async prepareTournamentBracket(championshipId) {
     try {
       // First try the new centralized atomic bracket generator
@@ -780,15 +610,13 @@ class AdminService {
         .select('*')
         .or('match_result_status.eq.disputed,status.eq.disputed')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       return data || [];
     } catch (e) {
       console.error('Error in fetchDisputedBookings:', e);
-      return [];
+      throw e;
     }
   }
-
   async resolveDispute({
     bookingId,
     winnerOutcome = 'home_win', // 'home_win' | 'away_win' | 'draw' | 'cancelled'
@@ -852,181 +680,137 @@ class AdminService {
         .from('reports')
         .select('*')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       return data || [];
     } catch (e) {
       console.error('Error in fetchReports:', e);
-      return [];
+      throw e;
     }
   }
-
-  // =========================================================================
-  // MODULE F: VSP OFFICIAL 1v1 LEAGUE MANAGER
-  // =========================================================================
   async fetch1v1LeaguePlayers() {
     try {
       const { data, error } = await this.client
         .from('vsp_1vs1_players')
         .select('*')
         .order('total_points', { ascending: false });
-
       if (error) throw error;
       return data || [];
     } catch (e) {
       console.error('Error in fetch1v1LeaguePlayers:', e);
-      return [];
+      throw e;
     }
   }
-
   async fetch1v1PendingRegistrations() {
     try {
-      // Try with user relation
       const { data, error } = await this.client
         .from('vsp_1v1_registrations')
         .select('*, users(name, phone, profile_image_url, email)')
         .or('status.eq.pending,status.is.null')
         .order('created_at', { ascending: false });
-
-      if (!error && data) return data;
-
-      // Fallback without relation
-      const fallback = await this.client
-        .from('vsp_1v1_registrations')
-        .select('*')
-        .or('status.eq.pending,status.is.null')
-        .order('created_at', { ascending: false });
-
-      return fallback.data || [];
+      if (error) throw error;
+      return data || [];
     } catch (e) {
       console.error('Error in fetch1v1PendingRegistrations:', e);
-      return [];
+      throw e;
     }
   }
-
   async fetch1v1ApprovedCount() {
     try {
       const { count, error } = await this.client
         .from('vsp_1v1_registrations')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'approved');
-
       if (error) throw error;
-      return count || 0;
+      return count ?? 0;
     } catch (e) {
-      return 0;
+      console.error('Error in fetch1v1ApprovedCount:', e);
+      throw e;
     }
   }
-
   async fetch1v1RegistrationOpenStatus() {
     try {
-      const { data } = await this.client
+      const { data, error } = await this.client
         .from('app_config')
         .select('vsp_1v1_is_open')
         .maybeSingle();
-
-      if (data && data.vsp_1v1_is_open !== undefined) {
-        return Boolean(data.vsp_1v1_is_open);
+      if (error) throw error;
+      if (!data || data.vsp_1v1_is_open === undefined) {
+        throw new Error('VSP 1v1 registration state is unavailable in Supabase');
       }
-      return true;
-    } catch (_) {
-      return true;
+      return Boolean(data.vsp_1v1_is_open);
+    } catch (e) {
+      console.error('Error fetching 1v1 gate status:', e);
+      throw e;
     }
   }
-
   async set1v1RegistrationOpenStatus(isOpen) {
     try {
-      const { error } = await this.client
-        .from('app_config')
-        .upsert({ id: 1, vsp_1v1_is_open: isOpen, updated_at: new Date().toISOString() });
-
+      const { data, error } = await this.client.rpc('admin_set_1v1_registration_open_atomic', {
+        p_is_open: isOpen,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث حالة التسجيل');
+      return { success: true, data };
     } catch (e) {
       console.error('Error setting 1v1 gate status:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async startNew1v1SeasonWipeRegistrations() {
     try {
-      const { error } = await this.client
-        .from('vsp_1v1_registrations')
-        .delete()
-        .not('id', 'is', null);
-
+      const { data, error } = await this.client.rpc('admin_wipe_1v1_data_atomic');
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل بدء الموسم الجديد');
+      return { success: true, data };
     } catch (e) {
-      console.error('Error wiping 1v1 registrations:', e);
+      console.error('Error wiping 1v1 season data:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async approve1v1Registration({ registrationId, name, avatarUrl = '' }) {
     try {
-      // 1. Mark registration approved
-      const { error: regErr } = await this.client
-        .from('vsp_1v1_registrations')
-        .update({ status: 'approved' })
-        .eq('id', registrationId);
-
-      if (regErr) throw regErr;
-
-      // 2. Add to 1v1 players roster
-      const { error: playerErr } = await this.client.from('vsp_1vs1_players').insert({
-        name: name || '1v1 Player',
-        avatar_url: avatarUrl || '',
-        total_points: 0,
-        skill_points: 0,
-        goals: 0,
-        tackles: 0,
-        titles: 0,
-        trend: 'stable',
+      const { data, error } = await this.client.rpc('admin_approve_1v1_registration_atomic', {
+        p_registration_id: registrationId,
+        p_name: name || null,
+        p_avatar_url: avatarUrl || null,
       });
-
-      if (playerErr) throw playerErr;
-      return { success: true };
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل اعتماد اللاعب');
+      return { success: true, data };
     } catch (e) {
       console.error('Error approving 1v1 registration:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async reject1v1Registration(registrationId) {
     try {
-      const { error } = await this.client
-        .from('vsp_1v1_registrations')
-        .update({ status: 'rejected', updated_at: new Date().toISOString() })
-        .eq('id', registrationId);
-
+      const { data, error } = await this.client.rpc('admin_reject_1v1_registration_atomic', {
+        p_registration_id: registrationId,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل رفض التسجيل');
+      return { success: true, data };
     } catch (e) {
       console.error('Error rejecting 1v1 registration:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async reset1v1Round() {
     try {
-      const { error } = await this.client
-        .from('vsp_1v1_registrations')
-        .update({ status: 'archived', updated_at: new Date().toISOString() });
-
+      const { data, error } = await this.client.rpc('admin_reset_1v1_round_atomic');
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل إعادة ضبط الجولة');
+      return { success: true, data };
     } catch (e) {
       console.error('Error resetting 1v1 round:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async add1v1Player({ name, avatarUrl = '', initialPoints = 0 }) {
     try {
       const { data, error } = await this.client
@@ -1099,78 +883,65 @@ class AdminService {
 
   async wipe1v1TournamentData() {
     try {
-      await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
-      await this.client.from('vsp_1v1_registrations').delete().not('id', 'is', null);
-      return { success: true };
+      const { data, error } = await this.client.rpc('admin_wipe_1v1_data_atomic');
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل مسح بيانات 1v1');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in wipe1v1TournamentData:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async update1v1PlayerStats(playerId, stats) {
     try {
-      const { error } = await this.client
-        .from('vsp_1vs1_players')
-        .update({
-          total_points: Number(stats.total_points || 0),
-          skill_points: Number(stats.skill_points || 0),
-          goals: Number(stats.goals || 0),
-          tackles: Number(stats.tackles || 0),
-          titles: Number(stats.titles || 0),
-          trend: stats.trend || 'stable',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', playerId);
-
+      const values = {
+        total: Math.max(0, Number(stats.total_points ?? 0)),
+        skill: Math.max(0, Number(stats.skill_points ?? 0)),
+        goals: Math.max(0, Number(stats.goals ?? 0)),
+        tackles: Math.max(0, Number(stats.tackles ?? 0)),
+        titles: Math.max(0, Number(stats.titles ?? 0)),
+        trend: stats.trend || 'stable',
+      };
+      const { data, error } = await this.client.rpc('admin_update_1v1_player_stats_atomic', {
+        p_player_id: playerId,
+        p_total_points: values.total,
+        p_skill_points: values.skill,
+        p_goals: values.goals,
+        p_tackles: values.tackles,
+        p_titles: values.titles,
+        p_trend: values.trend,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث إحصاءات اللاعب');
+      return { success: true, data };
     } catch (e) {
       console.error('Error updating 1v1 player stats:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-
-  // =========================================================================
-  // MODULE F.2: VSP 1v1 TOURNAMENT SYSTEM (NEW TABLES & ATOMIC RPC)
-  // =========================================================================
-
-  async create1v1Tournament({ name, target_player_count, entry_fee = 0, scheduled_at = null, created_by = null, governorate = 'Cairo' }) {
+  async create1v1Tournament({ name, target_player_count, entry_fee, scheduled_at, created_by = null, governorate }) {
     try {
-      const { data, error } = await this.client
-        .from('vsp_1v1_tournaments')
-        .insert({
-          name: name?.trim() || 'بطولة 1vs1 جديدة',
-          target_player_count: parseInt(target_player_count) || 8,
-          entry_fee: parseFloat(entry_fee) || 0,
-          prize_pool: 0,
-          governorate: governorate || 'Cairo',
-          status: 'registration_open',
-          scheduled_at: scheduled_at || null,
-          created_by: created_by || null,
-        })
-        .select()
-        .single();
-
+      if (!name || !target_player_count || entry_fee === undefined || !governorate) {
+        throw new Error('اسم البطولة وعدد اللاعبين ورسوم الاشتراك والمحافظة مطلوبة');
+      }
+      const { data, error } = await this.client.rpc('admin_create_1v1_tournament_atomic', {
+        p_name: name.trim(),
+        p_target_player_count: parseInt(target_player_count, 10),
+        p_entry_fee: Number(entry_fee),
+        p_scheduled_at: scheduled_at || null,
+        p_governorate: governorate,
+      });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل إنشاء بطولة 1v1');
       return { success: true, data };
     } catch (e) {
       console.error('Error creating 1v1 tournament:', e);
       const err = classifyError(e);
-      if (e?.code === '23505' || e?.message?.includes('idx_one_active_1v1_tournament_per_governorate') || e?.message?.includes('unique constraint')) {
-        return { 
-          success: false, 
-          error: 'يوجد بطولة نشطة حالياً في هذه المحافظة (' + governorate + '). يجب إنهاء أو أرشفة البطولة الحالية أولاً قبل بدء بطولة جديدة لنفس المحافظة.', 
-          errorType: 'conflict' 
-        };
-      }
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async mark1v1PrizeDelivered(tournamentId, notes = '') {
     try {
       const { data, error } = await this.client.rpc('mark_1v1_prize_delivered_atomic', {
@@ -1227,67 +998,35 @@ class AdminService {
 
   async update1v1TournamentStatus(tournamentId, status) {
     try {
-      const { error } = await this.client
-        .from('vsp_1v1_tournaments')
-        .update({ status })
-        .eq('id', tournamentId);
+      const { data, error } = await this.client.rpc('admin_update_1v1_tournament_status_atomic', {
+        p_tournament_id: tournamentId,
+        p_status: status,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث حالة بطولة 1v1');
+      return { success: true, data };
     } catch (e) {
       console.error('Error updating 1v1 status:', e);
-      return { success: false, error: e.message };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-  async saveAndPublish1v1Tournament({ tournamentId, playersList, fallbackStatus = 'registration_open' }) {
+  async saveAndPublish1v1Tournament({ tournamentId, playersList }) {
     try {
       if (!tournamentId) throw new Error('Missing tournament ID');
-
-      // 1. Try single atomic RPC if implemented on Supabase
-      try {
-        const { data: atomicData, error: atomicErr } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
-          p_tournament_id: tournamentId,
-          p_players: playersList,
-        });
-        if (atomicErr) {
-          if (atomicErr.message?.includes('MISSING_CHAMPION') || atomicErr.message?.includes('MULTIPLE_CHAMPIONS')) {
-            return { success: false, error: atomicErr.message };
-          }
-          console.warn('RPC atomic failed, falling back:', atomicErr);
-        } else if (atomicData?.success) {
-          return { success: true, data: atomicData };
-        }
-      } catch (rpcErr) {
-        if (rpcErr.message?.includes('MISSING_CHAMPION') || rpcErr.message?.includes('MULTIPLE_CHAMPIONS')) {
-          return { success: false, error: rpcErr.message };
-        }
-        // Fall back to 2-step transaction below
-      }
-
-      // 2. Fallback: 2-step transaction with manual rollback
-      // Step A: Save players
-      const saveRes = await this.save1v1TournamentPlayers(tournamentId, playersList);
-      if (!saveRes.success) {
-        throw new Error(saveRes.error || 'فشل حفظ بيانات درجات اللاعبين');
-      }
-
-      // Step B: Publish tournament
-      const pubRes = await this.publish1v1Tournament(tournamentId);
-      if (!pubRes.success) {
-        // Rollback status to previous status
-        console.warn('Publish failed, executing status rollback to:', fallbackStatus);
-        await this.update1v1TournamentStatus(tournamentId, fallbackStatus);
-        throw new Error(pubRes.error || 'فشل نشر الترتيب النهائي، وتم التراجع عن حالة البطولة');
-      }
-
-      return { success: true, data: pubRes.data };
+      const { data, error } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
+        p_tournament_id: tournamentId,
+        p_players: playersList,
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل حفظ ونشر بطولة 1v1');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in saveAndPublish1v1Tournament:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async publish1v1Tournament(tournamentId) {
     try {
       if (!tournamentId) throw new Error('Missing tournament ID');
@@ -1410,7 +1149,6 @@ class AdminService {
   // =========================================================================
   async fetchFinancialOverview() {
     try {
-      // 1. Fetch from authoritative PostgreSQL Reconciliation View, along with auxiliary metadata
       const [reconRes, ownersRes, stadiumsRes, upcomingRes, txRes, payoutsRes] = await Promise.all([
         this.client.from('v_financial_reconciliation').select('*'),
         this.client.from('users').select('id, name, phone, email, governorate, p2p_vodafone, p2p_instapay, p2p_bank').eq('role', 'owner'),
@@ -1436,31 +1174,29 @@ class AdminService {
       const transactions = txRes.data || [];
       const settlements = payoutsRes.data || [];
 
-      // Create indexed lookups
       const reconMap = new Map(reconList.map((r) => [r.owner_id, r]));
       const ownerStadiumsMap = new Map();
-      stadiums.forEach((s) => {
-        if (!ownerStadiumsMap.has(s.owner_id)) ownerStadiumsMap.set(s.owner_id, []);
-        ownerStadiumsMap.get(s.owner_id).push(s);
+      stadiums.forEach((st) => {
+        if (st.owner_id && !ownerStadiumsMap.has(st.owner_id)) ownerStadiumsMap.set(st.owner_id, []);
+        if (st.owner_id) ownerStadiumsMap.get(st.owner_id).push(st);
       });
 
-      // 2. Aggregate clearing matrix per owner based on PostgreSQL SSOT
       const ownerMatrix = owners.map((owner) => {
-        const recon = reconMap.get(owner.id) || {};
-        const ownerStadiums = ownerStadiumsMap.get(owner.id) || [];
-        const stadiumNames = ownerStadiums.map((s) => s.name).join(', ') || 'ملعب رئيسي';
+        const recon = reconMap.get(owner.id);
+        if (!recon) throw new Error(`Financial reconciliation row missing for owner ${owner.id}`);
 
-        // Escrow upcoming bookings for this owner
+        const ownerStadiums = ownerStadiumsMap.get(owner.id) || [];
+        const stadiumNames = ownerStadiums.map((st) => st.name).filter(Boolean).join(', ');
+
         const upcomingBookings = confirmedBookings
-          .filter((b) => b.owner_id === owner.id || ownerStadiums.some((s) => s.id === b.stadium_id))
+          .filter((b) => b.owner_id === owner.id || ownerStadiums.some((st) => st.id === b.stadium_id))
           .map((b) => ({
             id: b.id,
             amount: Number(b.deposit_paid > 0 && b.deposit_paid < b.total_price ? b.deposit_paid : b.total_price || 0),
             startTime: b.start_time,
-            stadiumName: b.stadium_name || 'ملعب',
+            stadiumName: b.stadium_name || null,
           }));
 
-        // Authoritative values from PostgreSQL View
         const completedOnlineRevenue = Number(recon.total_online_revenue || 0);
         const platformCommission = Number(recon.total_platform_commission || 0);
         const gatewayFees = Number(recon.total_gateway_fees || 0);
@@ -1469,34 +1205,29 @@ class AdminService {
         const cashDebt = Number(recon.accumulated_cash_debt || 0);
         const cashRevenue = Number(recon.total_pitch_cash_revenue || 0);
         const completedBookingsCount = Number(recon.completed_bookings_count || recon.active_bookings_count || 0);
-
-        // Escrow held from upcoming confirmed bookings
         const escrowHeld = upcomingBookings.reduce((sum, b) => sum + b.amount, 0);
+        const netOnlineEarnings = completedOnlineRevenue - gatewayFees - platformCommission;
+        const netBalance = Math.round((netOnlineEarnings - totalPaidOut - pendingPayouts - cashDebt) * 100) / 100;
 
-        // Net Earnings & Authoritative Available Balance (Zero-Trust SSOT)
-        const netOnlineEarnings = Math.max(0, completedOnlineRevenue - gatewayFees - platformCommission);
-        const netBalance = Math.max(0, Math.round((netOnlineEarnings - totalPaidOut - pendingPayouts - cashDebt) * 100) / 100);
-
-        // Payout Method & Destination
         let payoutMethod = null;
         let payoutDestination = null;
-        if (owner.p2p_vodafone && owner.p2p_vodafone.trim()) {
+        if (owner.p2p_vodafone?.trim()) {
           payoutMethod = 'vodafone_cash';
           payoutDestination = owner.p2p_vodafone.trim();
-        } else if (owner.p2p_instapay && owner.p2p_instapay.trim()) {
+        } else if (owner.p2p_instapay?.trim()) {
           payoutMethod = 'instapay';
           payoutDestination = owner.p2p_instapay.trim();
-        } else if (owner.p2p_bank && owner.p2p_bank.trim()) {
+        } else if (owner.p2p_bank?.trim()) {
           payoutMethod = 'bank_transfer';
           payoutDestination = owner.p2p_bank.trim();
         }
 
         return {
           ownerId: owner.id,
-          name: owner.name || 'صاحب ملعب',
-          phone: owner.phone || 'غير مسجل',
+          name: owner.name,
+          phone: owner.phone,
           email: owner.email,
-          governorate: owner.governorate || 'غير محدد',
+          governorate: owner.governorate,
           stadiumCount: ownerStadiums.length,
           stadiumNames,
           completedBookingsCount,
@@ -1519,39 +1250,24 @@ class AdminService {
         };
       });
 
-      // 3. Overall System Financial KPIs
       const totalGrossSystemVolume = ownerMatrix.reduce((sum, o) => sum + o.grossVolume, 0);
       const totalOnlineCollected = ownerMatrix.reduce((sum, o) => sum + o.onlineVolume, 0);
       const totalPlatformRevenue = ownerMatrix.reduce((sum, o) => sum + o.platformCommission, 0);
-      const totalPendingOwnerDues = ownerMatrix
-        .filter((o) => o.netBalance > 0)
-        .reduce((sum, o) => sum + o.netBalance, 0);
-      const totalEscrowHeld = ownerMatrix.reduce((sum, o) => sum + (o.escrowHeld || 0), 0);
+      const totalPendingOwnerDues = ownerMatrix.filter((o) => o.netBalance > 0).reduce((sum, o) => sum + o.netBalance, 0);
+      const totalEscrowHeld = ownerMatrix.reduce((sum, o) => sum + o.escrowHeld, 0);
       const totalSettledPayouts = ownerMatrix.reduce((sum, o) => sum + o.totalPaidOut, 0);
 
       return {
         ownerMatrix,
         transactions,
         settlements,
-        kpis: {
-          totalGrossSystemVolume,
-          totalOnlineCollected,
-          totalPlatformRevenue,
-          totalPendingOwnerDues,
-          totalEscrowHeld,
-          totalSettledPayouts,
-        },
+        kpis: { totalGrossSystemVolume, totalOnlineCollected, totalPlatformRevenue, totalPendingOwnerDues, totalEscrowHeld, totalSettledPayouts },
       };
     } catch (e) {
       console.error('[AdminService] Error in fetchFinancialOverview from SSOT view:', e);
-      const err = classifyError(e);
-      return {
-        error: err.message,
-        errorType: err.type,
-      };
+      throw e;
     }
   }
-
   async fetchFinancialTransactions() {
     const { data, error } = await this.client
       .from('transactions')
@@ -1572,64 +1288,27 @@ class AdminService {
   }) {
     try {
       const settleAmount = Number(amount);
-      if (isNaN(settleAmount) || settleAmount <= 0) {
+      if (!Number.isFinite(settleAmount) || settleAmount <= 0) {
         return { success: false, error: 'المبلغ المحدد غير صالح للتسوية المالية' };
       }
 
-      const ref = referenceNumber || null;
-
-      // 1. 🔒 التنفيذ الذري الصارم عبر RPC - إيقاف أي إجراء واعتبار المعاملة فاشلة فوراً إذا لم تنجح في الداتابيز
-      const { data: rpcData, error: rpcError } = await this.client.rpc('admin_record_payout_settlement_atomic', {
+      // One authoritative accounting operation. The RPC creates the settlement,
+      // transaction and owner notification atomically.
+      const { data, error } = await this.client.rpc('admin_record_payout_settlement_atomic', {
         p_owner_id: ownerId,
         p_amount: settleAmount,
         p_payment_method: method,
-        p_reference: ref,
+        p_reference: referenceNumber || null,
       });
-
-      if (rpcError) {
-        console.error('[AdminService] Settlement RPC failure:', rpcError);
-        throw new Error(`فشلت تسوية أرباح المالك في قاعدة البيانات: ${rpcError.message}`);
-      }
-
-      if (rpcData && rpcData.success === false) {
-        throw new Error(`فشلت تسوية أرباح المالك: ${rpcData.error || 'الرصيد المستحق في دفتر الأستاذ غير كافٍ'}`);
-      }
-
-      const serverReference = rpcData?.reference_number || ref;
-
-      // 2. توثيق سجل التحويل فقط بعد نجاح المعاملة المحاسبية الفعلية في قاعدة البيانات
-      const { error: settlementInsertError } = await this.client.from('payout_settlements').insert({
-        owner_id: ownerId,
-        amount: settleAmount,
-        method,
-        destination: destination || 'المحفظة المسجلة',
-        status: 'paid',
-        admin_notes: notes ? `${notes} (Ref: ${serverReference})` : `Ref: ${serverReference}`,
-      });
-      if (settlementInsertError) throw settlementInsertError;
-
-      // 3. إشعار المالك بالتحويل الناجح
-      try {
-        await this.client.from('notifications').insert({
-          user_id: ownerId,
-          title: 'تم تحويل مستحقاتك المالية بنجاح',
-          message: `تم إرسال مبلغ ${settleAmount.toLocaleString()} ج.م إلى حسابك عبر ${method} برقم مرجع: ${serverReference}`,
-          type: 'financial',
-          is_read: false,
-          created_at: new Date().toISOString(),
-        });
-      } catch (notifErr) {
-        console.warn('Payout notification dispatch notice:', notifErr);
-      }
-
-      return { success: true, referenceNumber: serverReference };
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشلت تسوية أرباح المالك');
+      return { success: true, referenceNumber: data.reference_number, data };
     } catch (e) {
       console.error('Error in recordSmartOwnerSettlement:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async fetchPayoutSettlements() {
     const { data, error } = await this.client
       .from('payout_settlements')
@@ -1642,41 +1321,24 @@ class AdminService {
 
   async recordPayoutSettlement({ settlementId, ownerId, amount, transactionId, method = 'vodafone_cash' }) {
     try {
-      const refNumber = transactionId || null;
+      if (settlementId) {
+        const { data, error } = await this.client.rpc('approve_payout_settlement_atomic', {
+          p_settlement_id: settlementId,
+          p_admin_notes: transactionId ? `Ref: ${transactionId}` : null,
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'فشل اعتماد التسوية');
+        return { success: true, data };
+      }
 
-      // 🔒 Strict Security: Atomic RPC only, no direct transaction insertion fallback
-      const { data, error: rpcErr } = await this.client.rpc('admin_record_payout_settlement_atomic', {
+      const { data, error } = await this.client.rpc('admin_record_payout_settlement_atomic', {
         p_owner_id: ownerId,
         p_amount: Number(amount),
         p_payment_method: method,
-        p_reference: refNumber,
+        p_reference: transactionId || null,
       });
-
-      if (rpcErr) {
-        console.error('[AdminService] admin_record_payout_settlement_atomic failed:', rpcErr);
-        throw new Error(`فشلت تسوية أرباح المالك: ${rpcErr.message}`);
-      }
-
-      if (data && data.success === false) {
-        throw new Error(`فشلت تسوية أرباح المالك: ${data.error || 'خطأ غير معروف'}`);
-      }
-
-      const serverReference = data?.reference_number || refNumber;
-
-      // Update payout_settlements record
-      if (settlementId) {
-        const { error: updateErr } = await this.client
-          .from('payout_settlements')
-          .update({
-            status: 'paid',
-            admin_notes: `Ref: ${serverReference}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', settlementId);
-
-        if (updateErr) throw updateErr;
-      }
-
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشلت تسوية أرباح المالك');
       return { success: true, data };
     } catch (e) {
       console.error('Error in recordPayoutSettlement:', e);
@@ -1684,10 +1346,6 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-  // =========================================================================
-  // MODULE H: CRM BROADCAST CENTER & SYSTEM CONFIG
-  // =========================================================================
   async fetchSystemConfig() {
     try {
       const { data, error } = await this.client
@@ -1750,7 +1408,7 @@ class AdminService {
       if (usersErr) throw usersErr;
 
       if (!users || users.length === 0) {
-        return { success: false, count: 0, error: 'لا يوجد مستخدمين مسجلين في الفئة المحددة' };
+        return { success: true, count: 0 };
       }
 
       const payloads = users.map((u) => ({
@@ -1767,7 +1425,8 @@ class AdminService {
       const chunkSize = 100;
       for (let i = 0; i < payloads.length; i += chunkSize) {
         const chunk = payloads.slice(i, i + chunkSize);
-        await this.client.from('notifications').insert(chunk);
+        const { error: insertError } = await this.client.from('notifications').insert(chunk);
+        if (insertError) throw insertError;
       }
 
       return { success: true, count: payloads.length };
