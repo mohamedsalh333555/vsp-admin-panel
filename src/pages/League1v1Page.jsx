@@ -411,26 +411,7 @@ export const League1v1Page = () => {
     try {
       setProcessing(true);
 
-      // التحقق الصريح من تحديد البطل لتفادي تتويج وهمي
-      const champions = players.filter((p) => (p.round_reached || '').toLowerCase() === 'champion');
-      if (champions.length === 0) {
-        setAlert({
-          type: 'error',
-          message: '⚠️ يجب تحديد بطل البطولة (اختيار "🏆 بطل البطولة" في خانة الدور الذي بلغه) للاعب الفائز قبل النشر.',
-        });
-        setProcessing(false);
-        return;
-      }
-      if (champions.length > 1) {
-        setAlert({
-          type: 'error',
-          message: '⚠️ لا يمكن تحديد أكثر من بطل واحد للبطولة.',
-        });
-        setProcessing(false);
-        return;
-      }
-
-      // تنقية بيانات اللاعبين وتمرير الدور الذي بلغه
+      // تنقية بيانات اللاعبين والترتيب التلقائي للأعلى نقاطاً
       const cleanPlayers = players.map((p, idx) => ({
         player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
         user_id: p.user_id || null,
@@ -914,7 +895,7 @@ export const League1v1Page = () => {
  <div className="flex items-center gap-3 text-zinc-300 font-bold">
  <MagicStar className="w-5 h-5 text-zinc-400 flex-shrink-0" variant="Outline" />
  <span>
- المجموع التراكمي لمشوار البطولة = [دفاع × 1] + [أهداف × 1] + [مهارة × 1] • البطولة بنظام 6 جولات لكل مواجهة، والفائز هو صاحب أعلى نقاط تراكمية عند الدور الذي بلغه.
+ المجموع التراكمي = [دفاع × 1] + [أهداف × 1] + [مهارة × 1] • يتم ترتيب اللاعبين تلقائياً حسب إجمالي النقاط من الأعلى للأقل.
  </span>
  </div>
  <button
@@ -933,21 +914,20 @@ export const League1v1Page = () => {
  <thead className="bg-vsp-card/70 text-vsp-textSecondary border-b border-vsp-border">
  <tr>
  <th className="px-5 py-4 font-bold text-center w-14">#</th>
- <th className="px-5 py-4 font-bold min-w-[180px]">اسم اللاعب</th>
- <th className="px-5 py-4 font-bold text-center min-w-[160px]">الدور الذي بلغه</th>
- <th className="px-5 py-4 font-bold text-center min-w-[100px]">
+ <th className="px-5 py-4 font-bold min-w-[200px]">اسم اللاعب</th>
+ <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-cyan-400">
  <ShieldTick className="w-3.5 h-3.5" variant="Outline" />
  <span>دفاع (+1)</span>
  </div>
  </th>
- <th className="px-5 py-4 font-bold text-center min-w-[100px]">
+ <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-zinc-300 font-black">
  <DirectNormal className="w-3.5 h-3.5" variant="Outline" />
  <span>أهداف (+1)</span>
  </div>
  </th>
- <th className="px-5 py-4 font-bold text-center min-w-[100px]">
+ <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-purple-400">
  <Flash className="w-3.5 h-3.5" variant="Outline" />
  <span>مهارة (+1)</span>
@@ -980,29 +960,6 @@ export const League1v1Page = () => {
  placeholder={`اسم اللاعب #${idx + 1}`}
  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none transition-all"
  />
- </td>
-
- {/* Stage / Round Reached Dropdown (بدون افتراضي دور 32) */}
- <td className="px-5 py-3.5 text-center">
- <select
- value={p.round_reached || ''}
- onChange={(e) => handlePlayerChange(idx, 'round_reached', e.target.value)}
- className={`w-full bg-vsp-card border rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none transition-all ${
-   p.round_reached === 'champion'
-     ? 'border-vsp-accent text-vsp-accent bg-vsp-accent/10 font-black'
-     : p.round_reached === 'runner_up'
-     ? 'border-zinc-400 text-zinc-200'
-     : 'border-vsp-border text-zinc-400'
- }`}
- >
- <option value="" className="bg-zinc-900 text-zinc-400">-- لم يحدد --</option>
- <option value="champion" className="bg-zinc-900 text-vsp-accent font-bold">🏆 بطل البطولة</option>
- <option value="runner_up" className="bg-zinc-900 text-zinc-200 font-bold">🥈 الوصيف (النهائي)</option>
- <option value="semi_final" className="bg-zinc-900 text-zinc-300 font-bold">🥉 نصف النهائي</option>
- <option value="quarter_final" className="bg-zinc-900 text-zinc-400 font-bold">🎖️ ربع النهائي</option>
- <option value="round_16" className="bg-zinc-900 text-zinc-400">دور الـ 16</option>
- <option value="round_32" className="bg-zinc-900 text-zinc-400">دور الـ 32</option>
- </select>
  </td>
 
  {/* Tackles Input */}
@@ -1442,7 +1399,6 @@ export const League1v1Page = () => {
  <tr>
  <th className="px-4 py-3 font-bold text-center">المركز</th>
  <th className="px-4 py-3 font-bold">اللاعب</th>
- <th className="px-4 py-3 font-bold text-center">الدور</th>
  <th className="px-4 py-3 font-bold text-center">دفاع</th>
  <th className="px-4 py-3 font-bold text-center">أهداف</th>
  <th className="px-4 py-3 font-bold text-center">مهارة</th>
@@ -1456,23 +1412,6 @@ export const League1v1Page = () => {
  {idx === 0 ? ' #1' : `#${idx + 1}`}
  </td>
  <td className="px-4 py-3 font-bold text-white">{p.player_name}</td>
- <td className="px-4 py-3 text-center font-bold">
-   {p.round_reached === 'champion' ? (
-     <span className="text-vsp-accent font-black">🏆 بطل</span>
-   ) : p.round_reached === 'runner_up' ? (
-     <span className="text-zinc-300">🥈 وصيف</span>
-   ) : p.round_reached === 'semi_final' ? (
-     <span className="text-zinc-400">🥉 نصف نهائي</span>
-   ) : p.round_reached === 'quarter_final' ? (
-     <span className="text-zinc-400">🎖️ ربع نهائي</span>
-   ) : p.round_reached === 'round_16' ? (
-     <span className="text-zinc-500">دور 16</span>
-   ) : p.round_reached === 'round_32' ? (
-     <span className="text-zinc-500">دور 32</span>
-   ) : (
-     <span className="text-zinc-600">-</span>
-   )}
- </td>
  <td className="px-4 py-3 text-center text-cyan-400 font-bold">{p.tackles}</td>
  <td className="px-4 py-3 text-center text-zinc-300 font-bold">{p.goals}</td>
  <td className="px-4 py-3 text-center text-purple-400 font-bold">{p.skills}</td>
