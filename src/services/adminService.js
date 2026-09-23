@@ -73,78 +73,12 @@ class AdminService {
     }
   }
   async fetchRecentBookings(limit = 20) {
-    try {
-      const { data, error } = await this.client
-        .from('bookings')
-        .select(`
-          id,
-          created_at,
-          start_time,
-          end_time,
-          total_price,
-          payment_method,
-          payment_status,
-          status,
-          deposit_paid,
-          is_deposit_paid,
-          cancellation_reason,
-          refund_amount,
-          refund_transaction_id,
-          refunded_at,
-          refund_payment_method,
-          stadium_id,
-          user_id,
-          created_by_user_id,
-          player_team_name,
-          stadiums(name, governorate),
-          player:users!bookings_created_by_user_id_fkey(name, phone, email)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.warn('Booking join warning, falling back to batch lookup:', error.message);
-        const fallback = await this.client
-          .from('bookings')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        const rawBookings = fallback.data || [];
-        if (rawBookings.length === 0) return [];
-
-        // Manually hydrate user profiles & stadium details so player name is NEVER missing
-        const userIds = [...new Set(rawBookings.map((b) => b.created_by_user_id || b.user_id).filter(Boolean))];
-        const stadiumIds = [...new Set(rawBookings.map((b) => b.stadium_id).filter(Boolean))];
-
-        const [usersMapRes, stadiumsMapRes] = await Promise.all([
-          userIds.length > 0 ? this.client.from('users').select('id, name, phone, email').in('id', userIds) : { data: [] },
-          stadiumIds.length > 0 ? this.client.from('stadiums').select('id, name, governorate').in('id', stadiumIds) : { data: [] },
-        ]);
-
-        const userMap = new Map((usersMapRes.data || []).map((u) => [u.id, u]));
-        const stadiumMap = new Map((stadiumsMapRes.data || []).map((s) => [s.id, s]));
-
-        return rawBookings.map((b) => ({
-          ...b,
-          users: userMap.get(b.created_by_user_id || b.user_id) || null,
-          player: userMap.get(b.created_by_user_id || b.user_id) || null,
-          stadiums: stadiumMap.get(b.stadium_id) || b.stadiums || null,
-        }));
-      }
-
-      return (data || []).map((b) => ({
-        ...b,
-        users: b.player || b.users || null,
-      }));
-    } catch (e) {
-      console.error('Error fetching recent bookings:', e);
-      throw e;
-    }
+    const { data, error } = await this.client.from('bookings')
+      .select('id,created_at,start_time,end_time,total_price,payment_method,payment_status,status,deposit_paid,is_deposit_paid,cancellation_reason,refund_amount,refund_transaction_id,refunded_at,refund_payment_method,stadium_id,user_id,created_by_user_id,player_team_name,stadiums(name,governorate),player:users!bookings_created_by_user_id_fkey(name,phone,email)')
+      .order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data || []).map((b) => ({ ...b, users: b.player || b.users || null }));
   }
-
-  
-  // تأكيد تحصيل الحجز كاش بصورة ذرية وتأمين وسيلة الدفع cash
   async confirmCashBooking(bookingId, ownerId, totalPrice, collectedAmount = null) {
     try {
       const { data, error } = await this.client.rpc('confirm_cash_booking_atomic', {
@@ -164,80 +98,49 @@ class AdminService {
 
   async updateBookingDetails(bookingId, updates) {
     try {
-      const payload = {
-        ...updates,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await this.client
-        .from('bookings')
-        .update(payload)
-        .eq('id', bookingId);
-
+      const { data, error } = await this.client.rpc('admin_update_booking_safe_atomic', {
+        p_booking_id: bookingId,
+        p_updates: updates || {},
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث بيانات الحجز');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in updateBookingDetails:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async cancelBookingWithReason(bookingId, reason) {
     try {
-      const { error } = await this.client
-        .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancellation_reason: reason || 'Cancelled by Admin',
-          cancelled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', bookingId);
-
+      const { data, error } = await this.client.rpc('admin_cancel_booking_atomic', {
+        p_booking_id: bookingId,
+        p_reason: reason || 'Cancelled by Admin',
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل إلغاء الحجز');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in cancelBookingWithReason:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async deleteBookingPermanently(bookingId) {
     try {
-      const { error } = await this.client
-        .from('bookings')
-        .delete()
-        .eq('id', bookingId);
-
-      if (error) {
-        // إذا تعذر الحذف الجسدي بسبب ارتباطات المفاتيح الأجنبية، نؤرشف الحجز كملغي حفاظاً على سلامة البيانات
-        console.warn('Direct delete blocked by foreign key, falling back to archive:', error.message);
-        const { error: cancelErr } = await this.client
-          .from('bookings')
-          .update({
-            status: 'cancelled',
-            cancellation_reason: 'تم حذف الحجز وأرشفته من قِبل إدارة المنظومة',
-            cancelled_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', bookingId);
-
-        if (cancelErr) throw cancelErr;
-        return { success: true, archived: true };
-      }
-      return { success: true };
+      const { data, error } = await this.client.rpc('admin_cancel_booking_atomic', {
+        p_booking_id: bookingId,
+        p_reason: 'تمت أرشفة الحجز من قِبل إدارة المنظومة',
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل أرشفة الحجز');
+      return { success: true, archived: true, data };
     } catch (e) {
       console.error('Error in deleteBookingPermanently:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
-  // =========================================================================
-  // MODULE B: OWNER AUDITS & ONBOARDING
-  // =========================================================================
   async fetchPendingOwners() {
     try {
       const [usersRes, unverifiedStadiumsRes, allStadiumsRes] = await Promise.all([
@@ -323,19 +226,14 @@ class AdminService {
 
   async fetchStadiumForOwner(ownerId) {
     try {
-      const { data, error } = await this.client
-        .from('stadiums')
-        .select('*')
-        .eq('owner_id', ownerId)
-        .maybeSingle();
-
+      const { data, error } = await this.client.from('stadiums').select('*').eq('owner_id', ownerId).maybeSingle();
       if (error) throw error;
       return data;
     } catch (e) {
-      return null;
+      console.error('Error fetching stadium for owner:', e);
+      throw e;
     }
   }
-
   async approveOwner({ ownerId, stadiumId }) {
     try {
       // 🔒 Strict Security: Atomic RPC only, no direct table fallback
@@ -362,24 +260,19 @@ class AdminService {
 
   async rejectOwner({ ownerId, reason }) {
     try {
-      const { error } = await this.client
-        .from('users')
-        .update({
-          verification_status: 'rejected',
-          last_warning: reason,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ownerId);
-
+      const { data, error } = await this.client.rpc('admin_reject_owner_atomic', {
+        p_owner_id: ownerId,
+        p_reason: reason || null,
+      });
       if (error) throw error;
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل رفض المالك');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in rejectOwner:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async fetchOwnersWithSubscriptions({ searchQuery = '' } = {}) {
     try {
       let query = this.client
@@ -1040,48 +933,18 @@ class AdminService {
 
   async publish1v1Standings(playersList) {
     try {
-      // 1. Clear current standings
-      await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
-
-      // 2. Sort players by total points desc
-      const sorted = [...playersList].sort((a, b) => {
-        const ptA = (Number(a.tackles) || 0) + (Number(a.goals) || 0) + (Number(a.skill_points) || 0);
-        const ptB = (Number(b.tackles) || 0) + (Number(b.goals) || 0) + (Number(b.skill_points) || 0);
-        return ptB - ptA;
+      const { data, error } = await this.client.rpc('admin_publish_legacy_1v1_standings_atomic', {
+        p_players: Array.isArray(playersList) ? playersList : [],
       });
-
-      // 3. Format rows
-      const formatted = sorted.map((p, idx) => {
-        const tackles = Math.max(0, parseInt(p.tackles) || 0);
-        const goals = Math.max(0, parseInt(p.goals) || 0);
-        const skills = Math.max(0, parseInt(p.skill_points) || 0);
-        const total = tackles + goals + skills;
-        return {
-          name: p.name?.trim() || `لاعب #${idx + 1}`,
-          avatar_url: p.avatar_url || '',
-          tackles: tackles,
-          goals: goals,
-          skill_points: skills,
-          total_points: total,
-          titles: Number(p.titles) || (p.round_reached === 'champion' ? 1 : 0),
-          trend: p.round_reached === 'champion' ? 'up' : 'stable',
-          round_reached: p.round_reached ? p.round_reached.trim() : null,
-        };
-      });
-
-      if (formatted.length > 0) {
-        const { error } = await this.client.from('vsp_1vs1_players').insert(formatted);
-        if (error) throw error;
-      }
-
-      return { success: true };
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل نشر جدول 1v1');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in publish1v1Standings:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async wipe1v1TournamentData() {
     try {
       await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
