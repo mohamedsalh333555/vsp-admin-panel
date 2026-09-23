@@ -317,7 +317,7 @@ class AdminService {
       });
     } catch (e) {
       console.error('Error in fetchPendingOwners:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -1596,6 +1596,8 @@ class AdminService {
         throw new Error(`فشلت تسوية أرباح المالك: ${rpcData.error || 'الرصيد المستحق في دفتر الأستاذ غير كافٍ'}`);
       }
 
+      const serverReference = rpcData?.reference_number || ref;
+
       // 2. توثيق سجل التحويل فقط بعد نجاح المعاملة المحاسبية الفعلية في قاعدة البيانات
       await this.client.from('payout_settlements').insert({
         owner_id: ownerId,
@@ -1603,9 +1605,7 @@ class AdminService {
         method,
         destination: destination || 'المحفظة المسجلة',
         status: 'paid',
-        admin_notes: notes ? `${notes} (Ref: ${ref})` : `Ref: ${ref}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        admin_notes: notes ? `${notes} (Ref: ${serverReference})` : `Ref: ${serverReference}`,
       });
 
       // 3. إشعار المالك بالتحويل الناجح
@@ -1613,7 +1613,7 @@ class AdminService {
         await this.client.from('notifications').insert({
           user_id: ownerId,
           title: 'تم تحويل مستحقاتك المالية بنجاح',
-          message: `تم إرسال مبلغ ${settleAmount.toLocaleString()} ج.م إلى حسابك عبر ${method} برقم مرجع: ${ref}`,
+          message: `تم إرسال مبلغ ${settleAmount.toLocaleString()} ج.م إلى حسابك عبر ${method} برقم مرجع: ${serverReference}`,
           type: 'financial',
           is_read: false,
           created_at: new Date().toISOString(),
@@ -1622,7 +1622,7 @@ class AdminService {
         console.warn('Payout notification dispatch notice:', notifErr);
       }
 
-      return { success: true, referenceNumber: ref };
+      return { success: true, referenceNumber: serverReference };
     } catch (e) {
       console.error('Error in recordSmartOwnerSettlement:', e);
       const err = classifyError(e);
@@ -1672,13 +1672,15 @@ class AdminService {
         throw new Error(`فشلت تسوية أرباح المالك: ${data.error || 'خطأ غير معروف'}`);
       }
 
+      const serverReference = data?.reference_number || refNumber;
+
       // Update payout_settlements record
       if (settlementId) {
         const { error: updateErr } = await this.client
           .from('payout_settlements')
           .update({
             status: 'paid',
-            admin_notes: `Ref: ${refNumber}`,
+            admin_notes: `Ref: ${serverReference}`,
             updated_at: new Date().toISOString(),
           })
           .eq('id', settlementId);
