@@ -36,35 +36,35 @@ class AdminService {
         this.fetchFinancialOverview(),
       ]);
 
-      if (usersRes.error) throw usersRes.error;
-      if (stadiumsRes.error) throw stadiumsRes.error;
-      if (bookingsRes.error) throw bookingsRes.error;
-      if (league1v1Res.error) throw league1v1Res.error;
-      if (disputesRes.error) throw disputesRes.error;
-      if (financialOverview?.error) throw new Error(financialOverview.error);
+      if (usersRes.error) console.warn('[AdminService] usersRes.error:', usersRes.error);
+      if (stadiumsRes.error) console.warn('[AdminService] stadiumsRes.error:', stadiumsRes.error);
+      if (bookingsRes.error) console.warn('[AdminService] bookingsRes.error:', bookingsRes.error);
+      if (league1v1Res.error) console.warn('[AdminService] league1v1Res.error:', league1v1Res.error);
+      if (disputesRes.error) console.warn('[AdminService] disputesRes.error:', disputesRes.error);
 
       let total1v1Players = league1v1Res?.count || 0;
       if (total1v1Players === 0) {
-        const tPlayersRes = await this.client.from('vsp_1v1_tournament_players').select('*', { count: 'exact', head: true });
-        if (tPlayersRes.error) throw tPlayersRes.error;
-        total1v1Players = tPlayersRes?.count || 0;
+        try {
+          const tPlayersRes = await this.client.from('vsp_1v1_tournament_players').select('*', { count: 'exact', head: true });
+          if (!tPlayersRes.error) total1v1Players = tPlayersRes?.count || 0;
+        } catch (_) {}
       }
 
       const pendingOwnersCount = Array.isArray(pendingOwners) ? pendingOwners.length : 0;
-      const bookingRows = bookingsRes.data || [];
+      const bookingRows = Array.isArray(bookingsRes?.data) ? bookingsRes.data : [];
       const validBookings = bookingRows.filter((b) => b.status === 'confirmed' || b.status === 'completed' || b.status === 'paid');
-      const totalRevenue = Number(financialOverview.kpis.totalGrossSystemVolume || 0);
+      const totalRevenue = Number(financialOverview?.kpis?.totalGrossSystemVolume || 0);
 
       return {
-        totalUsers: usersRes.count ?? 0,
-        totalStadiums: stadiumsRes.count ?? 0,
+        totalUsers: usersRes?.count ?? 0,
+        totalStadiums: stadiumsRes?.count ?? 0,
         totalBookings: validBookings.length || bookingRows.length,
         totalRevenue,
         total1v1Players,
         pendingOwners: pendingOwnersCount,
-        disputesCount: disputesRes.count ?? 0,
-        pendingPayouts: financialOverview.kpis.totalPendingOwnerDues,
-        totalEscrowHeld: financialOverview.kpis.totalEscrowHeld,
+        disputesCount: disputesRes?.count ?? 0,
+        pendingPayouts: Number(financialOverview?.kpis?.totalPendingOwnerDues || 0),
+        totalEscrowHeld: Number(financialOverview?.kpis?.totalEscrowHeld || 0),
       };
     } catch (e) {
       console.error('Error in fetchDashboardStats:', e);
@@ -1163,12 +1163,12 @@ class AdminService {
         this.client.from('payout_settlements').select('*, users(name, phone, email, governorate)').order('created_at', { ascending: false }),
       ]);
 
-      if (reconRes.error) throw reconRes.error;
-      if (ownersRes.error) throw ownersRes.error;
-      if (stadiumsRes.error) throw stadiumsRes.error;
-      if (upcomingRes.error) throw upcomingRes.error;
-      if (txRes.error) throw txRes.error;
-      if (payoutsRes.error) throw payoutsRes.error;
+      if (reconRes.error) console.warn('[AdminService] recon view notice:', reconRes.error?.message);
+      if (ownersRes.error) console.warn('[AdminService] owners notice:', ownersRes.error?.message);
+      if (stadiumsRes.error) console.warn('[AdminService] stadiums notice:', stadiumsRes.error?.message);
+      if (upcomingRes.error) console.warn('[AdminService] upcoming notice:', upcomingRes.error?.message);
+      if (txRes.error) console.warn('[AdminService] transactions notice:', txRes.error?.message);
+      if (payoutsRes.error) console.warn('[AdminService] payouts notice:', payoutsRes.error?.message);
 
       const reconList = reconRes.data || [];
       const owners = ownersRes.data || [];
@@ -1287,6 +1287,17 @@ class AdminService {
       console.error('[AdminService] Error in fetchFinancialOverview from SSOT view:', e);
       const err = classifyError(e);
       return {
+        ownerMatrix: [],
+        transactions: [],
+        settlements: [],
+        kpis: {
+          totalGrossSystemVolume: 0,
+          totalOnlineCollected: 0,
+          totalPlatformRevenue: 0,
+          totalPendingOwnerDues: 0,
+          totalEscrowHeld: 0,
+          totalSettledPayouts: 0,
+        },
         error: err.message,
         errorType: err.type,
       };
