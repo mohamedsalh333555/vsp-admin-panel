@@ -1422,6 +1422,13 @@ class AdminService {
         this.client.from('payout_settlements').select('*, users(name, phone, email, governorate)').order('created_at', { ascending: false }),
       ]);
 
+      if (reconRes.error) throw reconRes.error;
+      if (ownersRes.error) throw ownersRes.error;
+      if (stadiumsRes.error) throw stadiumsRes.error;
+      if (upcomingRes.error) throw upcomingRes.error;
+      if (txRes.error) throw txRes.error;
+      if (payoutsRes.error) throw payoutsRes.error;
+
       const reconList = reconRes.data || [];
       const owners = ownersRes.data || [];
       const stadiums = stadiumsRes.data || [];
@@ -1546,21 +1553,13 @@ class AdminService {
   }
 
   async fetchFinancialTransactions() {
-    try {
-      const { data, error } = await this.client
-        .from('transactions')
-        .select('*, users(name, phone, role)')
-        .order('created_at', { ascending: false });
+    const { data, error } = await this.client
+      .from('transactions')
+      .select('*, users(name, phone, role)')
+      .order('created_at', { ascending: false });
 
-      if (error) {
-        const fallback = await this.client.from('transactions').select('*').order('created_at', { ascending: false });
-        return fallback.data || [];
-      }
-      return data || [];
-    } catch (e) {
-      console.error('Error fetching transactions:', e);
-      return [];
-    }
+    if (error) throw error;
+    return data || [];
   }
 
   async recordSmartOwnerSettlement({
@@ -1599,7 +1598,7 @@ class AdminService {
       const serverReference = rpcData?.reference_number || ref;
 
       // 2. توثيق سجل التحويل فقط بعد نجاح المعاملة المحاسبية الفعلية في قاعدة البيانات
-      await this.client.from('payout_settlements').insert({
+      const { error: settlementInsertError } = await this.client.from('payout_settlements').insert({
         owner_id: ownerId,
         amount: settleAmount,
         method,
@@ -1607,6 +1606,7 @@ class AdminService {
         status: 'paid',
         admin_notes: notes ? `${notes} (Ref: ${serverReference})` : `Ref: ${serverReference}`,
       });
+      if (settlementInsertError) throw settlementInsertError;
 
       // 3. إشعار المالك بالتحويل الناجح
       try {
@@ -1631,24 +1631,13 @@ class AdminService {
   }
 
   async fetchPayoutSettlements() {
-    try {
-      const { data, error } = await this.client
-        .from('payout_settlements')
-        .select('*, users(name, phone, email, governorate)')
-        .order('created_at', { ascending: false });
+    const { data, error } = await this.client
+      .from('payout_settlements')
+      .select('*, users(name, phone, email, governorate)')
+      .order('created_at', { ascending: false });
 
-      if (!error && data) return data;
-
-      const fallback = await this.client
-        .from('payout_settlements')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      return fallback.data || [];
-    } catch (e) {
-      console.error('Error in fetchPayoutSettlements:', e);
-      return [];
-    }
+    if (error) throw error;
+    return data || [];
   }
 
   async recordPayoutSettlement({ settlementId, ownerId, amount, transactionId, method = 'vodafone_cash' }) {
@@ -1685,9 +1674,7 @@ class AdminService {
           })
           .eq('id', settlementId);
 
-        if (updateErr) {
-          console.warn('[AdminService] Could not update payout_settlements record status:', updateErr);
-        }
+        if (updateErr) throw updateErr;
       }
 
       return { success: true, data };
