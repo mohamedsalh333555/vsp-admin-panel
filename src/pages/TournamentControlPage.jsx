@@ -448,7 +448,7 @@ export const TournamentControlPage = () => {
               : 'bg-vsp-surface hover:bg-vsp-card text-zinc-400 hover:text-white border border-vsp-border'
           }`}
         >
-          <CheckCircle className="w-4 h-4" />
+          <TickCircle className="w-4 h-4" />
           <span>البطولات المعتمدة</span>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
@@ -486,12 +486,12 @@ export const TournamentControlPage = () => {
       {/* Content */}
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-vsp-accent animate-spin" />
+          <RotateRight className="w-8 h-8 text-vsp-accent animate-spin" />
         </div>
       ) : activeTab === 'pending' ? (
         pendingTournaments.length === 0 ? (
           <EmptyState
-            icon={ShieldCheck}
+            icon={ShieldTick}
             title="لا توجد بطولات بانتظار الموافقة"
             subtitle="كافة بطولات ملاك الملاعب تم اعتمادها ومراجعتها بنجاح."
           />
