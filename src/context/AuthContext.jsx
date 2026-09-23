@@ -138,6 +138,7 @@ export const AuthProvider = ({ children }) => {
       throw err;
     }
 
+    setLoading(false);
     return data;
   };
 
