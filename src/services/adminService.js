@@ -1537,18 +1537,10 @@ class AdminService {
       };
     } catch (e) {
       console.error('[AdminService] Error in fetchFinancialOverview from SSOT view:', e);
+      const err = classifyError(e);
       return {
-        ownerMatrix: [],
-        transactions: [],
-        settlements: [],
-        kpis: {
-          totalGrossSystemVolume: 0,
-          totalOnlineCollected: 0,
-          totalPlatformRevenue: 0,
-          totalPendingOwnerDues: 0,
-          totalEscrowHeld: 0,
-          totalSettledPayouts: 0,
-        },
+        error: err.message,
+        errorType: err.type,
       };
     }
   }
@@ -1709,21 +1701,25 @@ class AdminService {
   // =========================================================================
   async fetchSystemConfig() {
     try {
-      const { data } = await this.client
+      const { data, error } = await this.client
         .from('app_config')
         .select('*')
         .maybeSingle();
 
-      if (data) {
-        return {
-          maintenance_mode: Boolean(data.is_maintenance),
-          vsp_1v1_is_open: Boolean(data.vsp_1v1_is_open),
-          min_version: data.min_version || '1.0.0',
-        };
+      if (error) throw error;
+      if (!data) {
+        return { success: false, error: 'بيانات إعدادات النظام غير متاحة في Supabase' };
       }
-      return { maintenance_mode: false, vsp_1v1_is_open: true };
+
+      return {
+        success: true,
+        maintenance_mode: Boolean(data.is_maintenance),
+        vsp_1v1_is_open: Boolean(data.vsp_1v1_is_open),
+        min_version: data.min_version ?? null,
+      };
     } catch (e) {
-      return { maintenance_mode: false, vsp_1v1_is_open: true };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
 
