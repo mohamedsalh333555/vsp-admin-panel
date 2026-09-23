@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../services/adminService';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { Toast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
@@ -25,6 +26,7 @@ import {
 
 export const UsersModerationPage = () => {
   const { t, lang, isRTL } = useLanguage();
+  const { user: currentAuthUser } = useAuth();
   const isAr = lang === 'ar' || isRTL;
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
@@ -40,6 +42,25 @@ export const UsersModerationPage = () => {
   const [userToToggleBlock, setUserToToggleBlock] = useState(null);
 
   const [toast, setToast] = useState(null);
+
+  const COFOUNDER_EMAILS = [
+    'mohamedsalh333555@gmail.com',
+    'admin@vsp.com',
+    'coo@vsp.com',
+    'hana.ramadan@vsp.com',
+    'ceo@vsp.com',
+  ];
+
+  const isProtectedUser = (target) => {
+    if (!target) return false;
+    if (currentAuthUser && target.id === currentAuthUser.id) return true;
+    const email = (target.email || '').toLowerCase().trim();
+    const role = (target.role || '').toLowerCase();
+    return (
+      COFOUNDER_EMAILS.includes(email) ||
+      ['cofounder', 'co_founder', 'super_admin'].includes(role)
+    );
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -72,6 +93,14 @@ export const UsersModerationPage = () => {
   const handleConfirmToggleBlock = async () => {
     if (!userToToggleBlock) return;
     const targetUser = userToToggleBlock;
+
+    // حماية سيادية: منع حظر الحساب الحالي أو المؤسسين الشركاء
+    if (isProtectedUser(targetUser)) {
+      showToast(t('cannot_block_self_or_cofounder'), 'error');
+      setUserToToggleBlock(null);
+      return;
+    }
+
     const nextBlocked = !targetUser.is_blocked;
     setProcessingId(targetUser.id);
     setUserToToggleBlock(null); // إغلاق النافذة فوراً للعودة للشاشة
@@ -104,7 +133,7 @@ export const UsersModerationPage = () => {
     try {
       const res = await adminService.resetNoShowCount(userId);
       if (res.success) {
-        showToast(t('save_booking_success'));
+        showToast(t('noshow_reset_success'));
         fetchUsers();
       } else {
         showToast(res.error || t('error_loading'), 'error');
@@ -122,7 +151,7 @@ export const UsersModerationPage = () => {
     try {
       const res = await adminService.approveAdminUser(userId);
       if (res.success) {
-        showToast(t('save_booking_success'));
+        showToast(t('admin_approved_success'));
         fetchUsers();
       } else {
         showToast(res.error || t('error_loading'), 'error');
@@ -137,11 +166,16 @@ export const UsersModerationPage = () => {
   // Delete User Permanently
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
+    if (isProtectedUser(userToDelete)) {
+      showToast(t('cannot_block_self_or_cofounder'), 'error');
+      setUserToDelete(null);
+      return;
+    }
     setProcessingId(userToDelete.id);
     try {
       const res = await adminService.deleteUserPermanently(userToDelete.id);
       if (res.success) {
-        showToast(t('delete_booking_success'));
+        showToast(t('user_deleted_success'));
         setUserToDelete(null);
         fetchUsers();
       } else {
@@ -153,13 +187,6 @@ export const UsersModerationPage = () => {
       setProcessingId(null);
     }
   };
-
-const COFOUNDER_EMAILS = [
-  'mohamedsalh333555@gmail.com',
-  'admin@vsp.com',
-  'hana.ramadan@vsp.com',
-  'ceo@vsp.com',
-];
 
   const renderRoleBadge = (user) => {
     const isCoFounder =
@@ -357,10 +384,7 @@ const COFOUNDER_EMAILS = [
                   const isBlocked = user.is_blocked || false;
                   const isProcessing = processingId === user.id;
                   const isPendingAdmin = user.role === 'pending_admin';
-                  const isCoFounder =
-                    user.role === 'cofounder' ||
-                    user.role === 'co_founder' ||
-                    COFOUNDER_EMAILS.includes((user.email || '').toLowerCase().trim());
+                  const isCoFounder = isProtectedUser(user);
 
                   return (
                     <tr key={user.id} className="hover:bg-vsp-card/30 transition-colors">

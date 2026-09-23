@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useLanguage } from './context/LanguageContext';
 import { AdminHeader } from './components/AdminHeader';
@@ -18,11 +18,39 @@ import { BannersManagementPage } from './pages/BannersManagementPage';
 import { CRMSettingsPage } from './pages/CRMSettingsPage';
 import { Clock, Logout, RotateRight } from 'iconsax-react';
 
+const VALID_TABS = [
+  'dashboard', 'owner_audits', 'owner_subscriptions', 'users',
+  'disputes', 'payout_settlements', 'league_1v1', 'tournaments',
+  'banners', 'settings',
+];
+
+const getInitialTab = () => {
+  const hash = window.location.hash.replace('#', '');
+  return VALID_TABS.includes(hash) ? hash : 'dashboard';
+};
+
 export default function App() {
   const { user, profile, loading, logout } = useAuth();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // مزامنة الرابط مع الصفحة النشطة لحفظ السياق عند الـ Refresh (F5)
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
+
+  // مزامنة الصفحة عند الضغط على زر الرجوع/الأمام في المتصفح
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (VALID_TABS.includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   if (loading) {
     return (

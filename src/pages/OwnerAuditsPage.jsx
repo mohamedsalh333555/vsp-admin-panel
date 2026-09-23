@@ -694,6 +694,17 @@ export const OwnerAuditsPage = () => {
                         {t('cannot_approve_empty_owner')}
                       </p>
                     )}
+                    {/* تحذير: المالك يملك ملعباً لكن لا توجد وثائق هوية */}
+                    {selectedOwner.hasStadium && !selectedOwner.hasDocs && (
+                      <div className="flex items-start gap-2 p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl mt-1">
+                        <span className="text-red-400 text-xs mt-0.5">⚠</span>
+                        <p className="text-[11px] text-red-300 leading-relaxed">
+                          {isAr
+                            ? 'لم يتم رفع وثائق إثبات الهوية (بطاقة رقم قومي أو سجل تجاري). الاعتماد بدون وثائق يُعرّض المنصة للمسؤولية القانونية.'
+                            : 'No identity documents uploaded (National ID or Commercial Register). Approving without documents creates legal exposure.'}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <button

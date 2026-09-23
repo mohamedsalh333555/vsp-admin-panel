@@ -77,7 +77,7 @@ export const DisputesPage = () => {
       });
 
       if (res.success) {
-        showToast(t('save_booking_success'));
+        showToast(t('dispute_resolved_success'));
         setSelectedDispute(null);
         fetchDisputes();
       } else {
@@ -252,6 +252,16 @@ export const DisputesPage = () => {
                 ))}
               </div>
             </div>
+
+            {/* تنبيه مالي عند اختيار الإلغاء والاسترداد */}
+            {resolutionForm.outcome === 'cancelled' && (
+              <div className="flex items-start gap-2.5 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                <span className="text-amber-400 text-sm mt-0.5">⚠</span>
+                <p className="text-xs text-amber-300 leading-relaxed">
+                  {t('dispute_escrow_refund_notice')}
+                </p>
+              </div>
+            )}
 
             {/* Score Overrides */}
             <div className="grid grid-cols-2 gap-3">

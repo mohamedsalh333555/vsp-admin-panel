@@ -198,6 +198,13 @@ const translations = {
     view: 'معاينة',
     wipe_season_prompt: 'سيقوم هذا الإجراء بمسح كافة طلبات التسجيل السابقة وتفريغ البوابة لبدء دورة تسجيل جديدة للموسم القادم. هل أنت متأكد؟',
     save_changes: 'حفظ التعديلات',
+    noshow_reset_success: 'تم تصفير عداد عدم الحضور للاعب بنجاح',
+    admin_approved_success: 'تم اعتماد وتفعيل صلاحيات المشرف بنجاح',
+    user_deleted_success: 'تم حذف حساب المستخدم نهائياً بنجاح',
+    dispute_resolved_success: 'تم اعتماد قرار فض النزاع وتحديث المباراة بنجاح',
+    protected_account: 'حساب محمي سيادياً',
+    cannot_block_self_or_cofounder: 'لا يمكن حظر هذا الحساب (حساب محمي للمؤسسين الشركاء أو حسابك الحالي)',
+    dispute_escrow_refund_notice: 'تنبيه مالي: اعتماد قرار الإلغاء سيقوم بإلغاء الحجز وتوجيه رد العربون للاعب وإسقاط مستحقات المالك.',
 
     // Disputes
     disputes_title: 'غرفة فض النزاعات وبلاغات المباريات',
@@ -597,6 +604,13 @@ const translations = {
     view: 'Preview',
     wipe_season_prompt: 'This action will clear all previous registrations and open the gate for a new season cycle. Are you sure?',
     save_changes: 'Save Changes',
+    noshow_reset_success: 'Player no-show count reset successfully',
+    admin_approved_success: 'Admin account approved and authorized successfully',
+    user_deleted_success: 'User account permanently deleted successfully',
+    dispute_resolved_success: 'Dispute decision finalized and saved successfully',
+    protected_account: 'Protected Account',
+    cannot_block_self_or_cofounder: 'Cannot block this protected account (co-founder or your current session)',
+    dispute_escrow_refund_notice: 'Financial Notice: Cancelling will mark the booking cancelled and schedule deposit refund to the player.',
 
     // Disputes
     disputes_title: 'Match Dispute Resolution Center',

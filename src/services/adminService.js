@@ -235,7 +235,22 @@ class AdminService {
         .delete()
         .eq('id', bookingId);
 
-      if (error) throw error;
+      if (error) {
+        // إذا تعذر الحذف الجسدي بسبب ارتباطات المفاتيح الأجنبية، نؤرشف الحجز كملغي حفاظاً على سلامة البيانات
+        console.warn('Direct delete blocked by foreign key, falling back to archive:', error.message);
+        const { error: cancelErr } = await this.client
+          .from('bookings')
+          .update({
+            status: 'cancelled',
+            cancellation_reason: 'تم حذف الحجز وأرشفته من قِبل إدارة المنظومة',
+            cancelled_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', bookingId);
+
+        if (cancelErr) throw cancelErr;
+        return { success: true, archived: true };
+      }
       return { success: true };
     } catch (e) {
       console.error('Error in deleteBookingPermanently:', e);
@@ -301,13 +316,25 @@ class AdminService {
           docs.leaseContractUrl || addData.lease_contract_url
         );
         const hasStadium = Boolean(stadium || u.has_stadium);
-        const isReadyForReview = Boolean(hasStadium || hasDocs);
+        const hasNationalId = Boolean(
+          docs.nationalIdFrontUrl || addData.national_id_front_url ||
+          docs.nationalIdBackUrl || addData.national_id_back_url
+        );
+        const hasCommercialOrContract = Boolean(
+          docs.commercialRegisterUrl || addData.commercial_register_url ||
+          docs.taxCardUrl || addData.tax_card_url ||
+          docs.leaseContractUrl || addData.lease_contract_url
+        );
+        // لا يعتبر المالك مكتملاً وجاهزاً للاعتماد إلا بوجود ملعب + وثيقة إثبات هوية رسمية أو سجل تجاري لمنع اعتماد ملاك وهميين
+        const isReadyForReview = Boolean(hasStadium && (hasNationalId || hasCommercialOrContract || hasDocs));
 
         return {
           ...u,
           linkedStadium: stadium,
           hasStadium,
           hasDocs,
+          hasNationalId,
+          hasCommercialOrContract,
           isReadyForReview,
           auditCategory: isReadyForReview ? 'ready' : 'incomplete',
         };
@@ -466,6 +493,19 @@ class AdminService {
         .eq('id', ownerId);
 
       if (updateErr) throw updateErr;
+
+      // عند ترقية المالك إلى باقة Pro، فك تجميد أي ملاعب كانت موقوفة بسبب كوتا الباقة التجريبية
+      try {
+        await this.client
+          .from('stadiums')
+          .update({
+            is_blocked: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('owner_id', ownerId)
+          .like('cancellation_policy', '%موقوف لانتهاء باقة Pro%');
+      } catch (_) {}
+
       return { success: true, expiresAt };
     } catch (e) {
       console.error('Error in activateVspPro:', e);
@@ -484,7 +524,7 @@ class AdminService {
           p_days: 0,
         });
         if (!rpcErr && rpcData?.success) {
-          return { success: true };
+          // RPC succeeded, continue to quota enforcement
         }
       } catch (err) {
         console.warn('RPC call exception, attempting fallback:', err);
@@ -501,6 +541,30 @@ class AdminService {
         .eq('id', ownerId);
 
       if (error) throw error;
+
+      // 3. ضبط كوتا الملاعب: الباقة التجريبية تسمح بملعب واحد فقط - تجميد الملاعب الزائدة لتفادي الاستغلال المجاني
+      try {
+        const { data: stadiums } = await this.client
+          .from('stadiums')
+          .select('id, name')
+          .eq('owner_id', ownerId)
+          .order('created_at', { ascending: true });
+
+        if (stadiums && stadiums.length > 1) {
+          const extraStadiumIds = stadiums.slice(1).map((s) => s.id);
+          await this.client
+            .from('stadiums')
+            .update({
+              is_blocked: true,
+              cancellation_policy: 'موقوف لانتهاء باقة Pro (تجاوز كوتا الباقة التجريبية)',
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', extraStadiumIds);
+        }
+      } catch (quotaErr) {
+        console.warn('Could not freeze extra stadiums on downgrade:', quotaErr);
+      }
+
       return { success: true };
     } catch (e) {
       console.error('Error in downgradeOwnerToBasic:', e);
@@ -596,6 +660,29 @@ class AdminService {
 
   async toggleUserBlockStatus(userId, isBlocked) {
     try {
+      if (isBlocked) {
+        // 🔒 حماية سيادية: منع حظر حسابات المؤسسين الشركاء أو مسؤولي المنظومة برمجياً
+        const { data: targetUser } = await this.client
+          .from('users')
+          .select('email, role')
+          .eq('id', userId)
+          .maybeSingle();
+
+        const COFOUNDER_EMAILS = [
+          'mohamedsalh333555@gmail.com',
+          'admin@vsp.com',
+          'coo@vsp.com',
+          'hana.ramadan@vsp.com',
+          'ceo@vsp.com',
+        ];
+
+        const email = (targetUser?.email || '').toLowerCase().trim();
+        const role = (targetUser?.role || '').toLowerCase();
+        if (COFOUNDER_EMAILS.includes(email) || ['cofounder', 'co_founder', 'super_admin'].includes(role)) {
+          return { success: false, error: 'لا يمكن حظر هذا الحساب (حساب محمي للمؤسسين الشركاء أو إدارة المنظومة العليا)' };
+        }
+      }
+
       // 🔒 Strict Security: Atomic RPC only, no direct table fallback
       const { data, error } = await this.client.rpc('admin_toggle_user_block', {
         p_user_id: userId,
@@ -846,6 +933,32 @@ class AdminService {
 
       if (data && data.success === false) {
         throw new Error(`فشل فض النزاع: ${data.message || data.error || 'خطأ غير معروف'}`);
+      }
+
+      // توثيق وحفظ ملاحظات الحكم والأهداف وقرار الاسترداد في سجل الحجز
+      try {
+        const bookingUpdates = {
+          updated_at: new Date().toISOString(),
+        };
+        if (resolutionNotes) {
+          bookingUpdates.dispute_notes = resolutionNotes;
+        }
+        if (homeScore !== null && homeScore !== undefined && String(homeScore).trim() !== '') {
+          bookingUpdates.home_team_score = Number(homeScore);
+          bookingUpdates.host_score = Number(homeScore);
+        }
+        if (awayScore !== null && awayScore !== undefined && String(awayScore).trim() !== '') {
+          bookingUpdates.away_team_score = Number(awayScore);
+          bookingUpdates.away_score = Number(awayScore);
+        }
+        if (winnerOutcome === 'cancelled') {
+          bookingUpdates.status = 'cancelled';
+          bookingUpdates.cancellation_reason = resolutionNotes ? `ملغي بقرار فض النزاع: ${resolutionNotes}` : 'ملغي بقرار إدارة المنظومة وفض النزاع (استرداد العربون)';
+          bookingUpdates.cancelled_at = new Date().toISOString();
+        }
+        await this.client.from('bookings').update(bookingUpdates).eq('id', bookingId);
+      } catch (noteErr) {
+        console.warn('Booking dispute details update note:', noteErr);
       }
 
       return { success: true, data };
@@ -1590,22 +1703,34 @@ class AdminService {
     notes = '',
   }) {
     try {
+      const settleAmount = Number(amount);
+      if (isNaN(settleAmount) || settleAmount <= 0) {
+        return { success: false, error: 'المبلغ المحدد غير صالح للتسوية المالية' };
+      }
+
       const ref = referenceNumber || `SETTLE_${Date.now()}`;
 
-      // 1. Call atomic stored procedure if available
-      try {
-        await this.client.rpc('admin_record_payout_settlement_atomic', {
-          p_owner_id: ownerId,
-          p_amount: Number(amount),
-          p_payment_method: method,
-          p_reference: ref,
-        });
-      } catch (_) {}
+      // 1. 🔒 التنفيذ الذري الصارم عبر RPC - إيقاف أي إجراء واعتبار المعاملة فاشلة فوراً إذا لم تنجح في الداتابيز
+      const { data: rpcData, error: rpcError } = await this.client.rpc('admin_record_payout_settlement_atomic', {
+        p_owner_id: ownerId,
+        p_amount: settleAmount,
+        p_payment_method: method,
+        p_reference: ref,
+      });
 
-      // 2. Insert into payout_settlements for tracking
+      if (rpcError) {
+        console.error('[AdminService] Settlement RPC failure:', rpcError);
+        throw new Error(`فشلت تسوية أرباح المالك في قاعدة البيانات: ${rpcError.message}`);
+      }
+
+      if (rpcData && rpcData.success === false) {
+        throw new Error(`فشلت تسوية أرباح المالك: ${rpcData.error || 'الرصيد المستحق في دفتر الأستاذ غير كافٍ'}`);
+      }
+
+      // 2. توثيق سجل التحويل فقط بعد نجاح المعاملة المحاسبية الفعلية في قاعدة البيانات
       await this.client.from('payout_settlements').insert({
         owner_id: ownerId,
-        amount: Number(amount),
+        amount: settleAmount,
         method,
         destination: destination || 'المحفظة المسجلة',
         status: 'paid',
@@ -1614,15 +1739,19 @@ class AdminService {
         updated_at: new Date().toISOString(),
       });
 
-      // 3. Send notification to the owner
-      await this.client.from('notifications').insert({
-        user_id: ownerId,
-        title: 'تم تحويل مستحقاتك المالية بنجاح',
-        message: `تم إرسال مبلغ ${Number(amount).toLocaleString()} ج.م إلى حسابك عبر ${method} برقم مرجع: ${ref}`,
-        type: 'financial',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      });
+      // 3. إشعار المالك بالتحويل الناجح
+      try {
+        await this.client.from('notifications').insert({
+          user_id: ownerId,
+          title: 'تم تحويل مستحقاتك المالية بنجاح',
+          message: `تم إرسال مبلغ ${settleAmount.toLocaleString()} ج.م إلى حسابك عبر ${method} برقم مرجع: ${ref}`,
+          type: 'financial',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+      } catch (notifErr) {
+        console.warn('Payout notification dispatch notice:', notifErr);
+      }
 
       return { success: true, referenceNumber: ref };
     } catch (e) {
