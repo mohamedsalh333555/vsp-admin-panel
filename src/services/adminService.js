@@ -1088,8 +1088,9 @@ class AdminService {
           goals: goals,
           skill_points: skills,
           total_points: total,
-          titles: Number(p.titles) || (idx === 0 ? 1 : 0),
-          trend: idx === 0 ? 'up' : 'stable',
+          titles: Number(p.titles) || (p.round_reached === 'champion' ? 1 : 0),
+          trend: p.round_reached === 'champion' ? 'up' : 'stable',
+          round_reached: p.round_reached ? p.round_reached.trim() : null,
         };
       });
 
@@ -1215,6 +1216,7 @@ class AdminService {
         tackles: Math.max(0, parseInt(p.tackles) || 0),
         goals: Math.max(0, parseInt(p.goals) || 0),
         skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+        round_reached: p.round_reached ? p.round_reached.trim() : null,
         // NOTE: total_points is GENERATED ALWAYS AS by PostgreSQL, DO NOT SEND!
       }));
 
@@ -1257,10 +1259,18 @@ class AdminService {
           p_tournament_id: tournamentId,
           p_players: playersList,
         });
-        if (!atomicErr && atomicData?.success) {
+        if (atomicErr) {
+          if (atomicErr.message?.includes('MISSING_CHAMPION') || atomicErr.message?.includes('MULTIPLE_CHAMPIONS')) {
+            return { success: false, error: atomicErr.message };
+          }
+          console.warn('RPC atomic failed, falling back:', atomicErr);
+        } else if (atomicData?.success) {
           return { success: true, data: atomicData };
         }
       } catch (rpcErr) {
+        if (rpcErr.message?.includes('MISSING_CHAMPION') || rpcErr.message?.includes('MULTIPLE_CHAMPIONS')) {
+          return { success: false, error: rpcErr.message };
+        }
         // Fall back to 2-step transaction below
       }
 
@@ -1378,6 +1388,7 @@ class AdminService {
         skills: p.skills || 0,
         skill_points: p.skills || 0,
         total_points: (p.tackles || 0) + (p.goals || 0) + (p.skills || 0),
+        round_reached: p.round_reached || '',
         rank: idx + 1,
       }));
 
