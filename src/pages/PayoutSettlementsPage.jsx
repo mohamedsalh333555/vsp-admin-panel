@@ -87,7 +87,7 @@ export const PayoutSettlementsPage = () => {
       amount: owner.netBalance > 0 ? owner.netBalance : '',
       method: meth,
       destination: dest,
-      referenceNumber: `TXN_${Date.now().toString().slice(-6)}`,
+      referenceNumber: '',
       notes: '',
     });
   };
@@ -659,7 +659,6 @@ export const PayoutSettlementsPage = () => {
               </label>
               <input
                 type="text"
-                required
                 value={settlementForm.referenceNumber}
                 onChange={(e) => setSettlementForm({ ...settlementForm, referenceNumber: e.target.value })}
                 className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
