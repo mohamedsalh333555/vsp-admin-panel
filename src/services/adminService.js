@@ -26,76 +26,52 @@ class AdminService {
   // =========================================================================
   async fetchDashboardStats() {
     try {
-      const [
-        usersRes,
-        stadiumsRes,
-        bookingsRes,
-        league1v1Res,
-        pendingOwners,
-        disputesRes,
-        financialOverview,
-      ] = await Promise.all([
+      const [usersRes, stadiumsRes, bookingsRes, league1v1Res, pendingOwners, disputesRes, financialOverview] = await Promise.all([
         this.client.from('users').select('*', { count: 'exact', head: true }),
         this.client.from('stadiums').select('*', { count: 'exact', head: true }),
         this.client.from('bookings').select('id, total_price, status'),
         this.client.from('vsp_1vs1_players').select('*', { count: 'exact', head: true }),
-        this.fetchPendingOwners().catch(() => []),
+        this.fetchPendingOwners(),
         this.client.from('bookings').select('*', { count: 'exact', head: true }).or('match_result_status.eq.disputed,status.eq.disputed'),
-        this.fetchFinancialOverview().catch(() => null),
+        this.fetchFinancialOverview(),
       ]);
 
-      // Calculate total 1v1 players from both global roster and active tournament rosters
+      if (usersRes.error) throw usersRes.error;
+      if (stadiumsRes.error) throw stadiumsRes.error;
+      if (bookingsRes.error) throw bookingsRes.error;
+      if (league1v1Res.error) throw league1v1Res.error;
+      if (disputesRes.error) throw disputesRes.error;
+      if (financialOverview?.error) throw new Error(financialOverview.error);
+
       let total1v1Players = league1v1Res?.count || 0;
       if (total1v1Players === 0) {
-        try {
-          const tPlayersRes = await this.client.from('vsp_1v1_tournament_players').select('*', { count: 'exact', head: true });
-          total1v1Players = tPlayersRes?.count || 0;
-        } catch (_) {}
+        const tPlayersRes = await this.client.from('vsp_1v1_tournament_players').select('*', { count: 'exact', head: true });
+        if (tPlayersRes.error) throw tPlayersRes.error;
+        total1v1Players = tPlayersRes?.count || 0;
       }
 
-      // Pending owners count strictly mirrors the Owner Audits page
       const pendingOwnersCount = Array.isArray(pendingOwners) ? pendingOwners.length : 0;
-
-      // Pending payouts: Net owner dues awaiting disbursement from collected online bookings
-      const pendingPayoutsAmount = financialOverview?.kpis?.totalPendingOwnerDues ?? 0;
-
-      let totalRevenue = 0;
-      let activeBookingsCount = 0;
-      if (bookingsRes.data && bookingsRes.data.length > 0) {
-        const validBookings = bookingsRes.data.filter(
-          (b) => b.status === 'confirmed' || b.status === 'completed' || b.status === 'paid'
-        );
-        activeBookingsCount = validBookings.length;
-        totalRevenue = validBookings.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
-      }
+      const bookingRows = bookingsRes.data || [];
+      const validBookings = bookingRows.filter((b) => b.status === 'confirmed' || b.status === 'completed' || b.status === 'paid');
+      const totalRevenue = validBookings.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
 
       return {
-        totalUsers: usersRes.count || 0,
-        totalStadiums: stadiumsRes.count || 0,
-        totalBookings: activeBookingsCount || bookingsRes.data?.length || 0,
+        totalUsers: usersRes.count ?? 0,
+        totalStadiums: stadiumsRes.count ?? 0,
+        totalBookings: validBookings.length || bookingRows.length,
         totalRevenue,
         total1v1Players,
         pendingOwners: pendingOwnersCount,
-        disputesCount: disputesRes.count || 0,
-        pendingPayouts: pendingPayoutsAmount,
-        totalEscrowHeld: financialOverview?.kpis?.totalEscrowHeld ?? 0,
+        disputesCount: disputesRes.count ?? 0,
+        pendingPayouts: financialOverview.kpis.totalPendingOwnerDues,
+        totalEscrowHeld: financialOverview.kpis.totalEscrowHeld,
       };
     } catch (e) {
       console.error('Error in fetchDashboardStats:', e);
-      return {
-        totalUsers: 0,
-        totalStadiums: 0,
-        totalBookings: 0,
-        totalRevenue: 0,
-        total1v1Players: 0,
-        pendingOwners: 0,
-        disputesCount: 0,
-        pendingPayouts: 0,
-        error: e.message,
-      };
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async fetchRecentBookings(limit = 20) {
     try {
       const { data, error } = await this.client
@@ -443,70 +419,14 @@ class AdminService {
 
   async activateVspPro({ ownerId, days = 30 }) {
     try {
-      // 1. Try atomic admin RPC (bypasses sensitive field trigger restrictions safely)
-      try {
-        const { data: rpcData, error: rpcErr } = await this.client.rpc('admin_set_owner_subscription_atomic', {
-          p_owner_id: ownerId,
-          p_plan: 'pro',
-          p_days: Number(days) || 30,
-        });
-        if (!rpcErr && rpcData?.success) {
-          return { success: true, expiresAt: rpcData.subscription_expires_at };
-        }
-        if (rpcErr) {
-          console.warn('admin_set_owner_subscription_atomic notice, attempting fallback:', rpcErr.message);
-        }
-      } catch (err) {
-        console.warn('RPC call exception, attempting fallback:', err);
-      }
-
-      // 2. Fallback: Cumulative extension calculation with direct update
-      let baseTime = Date.now();
-      try {
-        const { data: currentUser } = await this.client
-          .from('users')
-          .select('subscription_plan, subscription_expires_at')
-          .eq('id', ownerId)
-          .maybeSingle();
-
-        if (currentUser?.subscription_plan === 'pro' && currentUser?.subscription_expires_at) {
-          const currentExpiryTime = new Date(currentUser.subscription_expires_at).getTime();
-          if (currentExpiryTime > baseTime) {
-            // Cumulatively add days to the active expiration date
-            baseTime = currentExpiryTime;
-          }
-        }
-      } catch (fetchErr) {
-        console.warn('Could not fetch existing subscription date, falling back to Date.now()', fetchErr);
-      }
-
-      const expiresAt = new Date(baseTime + Number(days) * 24 * 60 * 60 * 1000).toISOString();
-
-      // Update user record
-      const { error: updateErr } = await this.client
-        .from('users')
-        .update({
-          subscription_plan: 'pro',
-          subscription_expires_at: expiresAt,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ownerId);
-
-      if (updateErr) throw updateErr;
-
-      // عند ترقية المالك إلى باقة Pro، فك تجميد أي ملاعب كانت موقوفة بسبب كوتا الباقة التجريبية
-      try {
-        await this.client
-          .from('stadiums')
-          .update({
-            is_blocked: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('owner_id', ownerId)
-          .like('cancellation_policy', '%موقوف لانتهاء باقة Pro%');
-      } catch (_) {}
-
-      return { success: true, expiresAt };
+      const { data, error } = await this.client.rpc('admin_set_owner_subscription_atomic', {
+        p_owner_id: ownerId,
+        p_plan: 'pro',
+        p_days: Number(days),
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل تفعيل الاشتراك');
+      return { success: true, expiresAt: data.subscription_expires_at, serverTime: data.server_time };
     } catch (e) {
       console.error('Error in activateVspPro:', e);
       const err = classifyError(e);
@@ -516,63 +436,20 @@ class AdminService {
 
   async downgradeOwnerToBasic({ ownerId }) {
     try {
-      // 1. Try atomic admin RPC
-      try {
-        const { data: rpcData, error: rpcErr } = await this.client.rpc('admin_set_owner_subscription_atomic', {
-          p_owner_id: ownerId,
-          p_plan: 'free_trial',
-          p_days: 0,
-        });
-        if (!rpcErr && rpcData?.success) {
-          // RPC succeeded, continue to quota enforcement
-        }
-      } catch (err) {
-        console.warn('RPC call exception, attempting fallback:', err);
-      }
-
-      // 2. Fallback direct update
-      const { error } = await this.client
-        .from('users')
-        .update({
-          subscription_plan: 'free_trial',
-          subscription_expires_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ownerId);
-
+      const { data, error } = await this.client.rpc('admin_set_owner_subscription_atomic', {
+        p_owner_id: ownerId,
+        p_plan: 'free_trial',
+        p_days: 0,
+      });
       if (error) throw error;
-
-      // 3. ضبط كوتا الملاعب: الباقة التجريبية تسمح بملعب واحد فقط - تجميد الملاعب الزائدة لتفادي الاستغلال المجاني
-      try {
-        const { data: stadiums } = await this.client
-          .from('stadiums')
-          .select('id, name')
-          .eq('owner_id', ownerId)
-          .order('created_at', { ascending: true });
-
-        if (stadiums && stadiums.length > 1) {
-          const extraStadiumIds = stadiums.slice(1).map((s) => s.id);
-          await this.client
-            .from('stadiums')
-            .update({
-              is_blocked: true,
-              cancellation_policy: 'موقوف لانتهاء باقة Pro (تجاوز كوتا الباقة التجريبية)',
-              updated_at: new Date().toISOString(),
-            })
-            .in('id', extraStadiumIds);
-        }
-      } catch (quotaErr) {
-        console.warn('Could not freeze extra stadiums on downgrade:', quotaErr);
-      }
-
-      return { success: true };
+      if (!data?.success) throw new Error(data?.error || 'فشل خفض الاشتراك');
+      return { success: true, serverTime: data.server_time };
     } catch (e) {
       console.error('Error in downgradeOwnerToBasic:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async createOwnerAndStadiumManually({
     name,
     phone,
@@ -1481,7 +1358,7 @@ class AdminService {
         name: p.player_name,
         user_id: p.user_id,
         avatar_url: p.avatar_url || '',
-        payment_status: p.payment_status || 'paid',
+        payment_status: p.payment_status ?? null,
         tackles: p.tackles || 0,
         goals: p.goals || 0,
         skills: p.skills || 0,
@@ -1708,7 +1585,7 @@ class AdminService {
         return { success: false, error: 'المبلغ المحدد غير صالح للتسوية المالية' };
       }
 
-      const ref = referenceNumber || `SETTLE_${Date.now()}`;
+      const ref = referenceNumber || null;
 
       // 1. 🔒 التنفيذ الذري الصارم عبر RPC - إيقاف أي إجراء واعتبار المعاملة فاشلة فوراً إذا لم تنجح في الداتابيز
       const { data: rpcData, error: rpcError } = await this.client.rpc('admin_record_payout_settlement_atomic', {
@@ -1784,7 +1661,7 @@ class AdminService {
 
   async recordPayoutSettlement({ settlementId, ownerId, amount, transactionId, method = 'vodafone_cash' }) {
     try {
-      const refNumber = transactionId || `TXN_${Date.now()}`;
+      const refNumber = transactionId || null;
 
       // 🔒 Strict Security: Atomic RPC only, no direct transaction insertion fallback
       const { data, error: rpcErr } = await this.client.rpc('admin_record_payout_settlement_atomic', {
