@@ -53,8 +53,9 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      const defaultName = normalizedEmail.includes('hana') ? 'Hana Ramadan' : 'Mohamed Saleh';
-      const defaultPosition = 'CEO & COO';
+      const isHana = normalizedEmail.includes('hana') || normalizedEmail.includes('ceo');
+      const defaultName = isHana ? 'Hana Ramadan' : 'Mohamed Saleh';
+      const defaultPosition = isHana ? 'CEO' : 'COO';
 
       if (data) {
         const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
@@ -62,10 +63,11 @@ export const AuthProvider = ({ children }) => {
         // أمان تام: التحقق من أن الدور إداري فعلياً وأن الحساب غير محظور
         const isApprovedAdmin = !data.is_blocked && (isCoFounder || (isAdminRole && data.verification_status === 'approved'));
 
-        // قراءة المنصب مباشرة من عمود position في الداتابيز أولاً وبشكل ديناميكي 100%
-        const livePosition = data.position?.trim() 
-          ? data.position 
-          : (data.additional_data?.title || (isCoFounder ? defaultPosition : 'Admin'));
+        // قراءة المنصب مباشرة من عمود position في الداتابيز، وتصحيح المنصب الافتراضي بدقة
+        let livePosition = data.position?.trim();
+        if (!livePosition || livePosition === 'CEO & COO') {
+          livePosition = isCoFounder ? defaultPosition : (data.additional_data?.title || 'Admin');
+        }
 
         setProfile({
           ...data,

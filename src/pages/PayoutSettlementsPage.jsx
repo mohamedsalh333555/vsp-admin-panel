@@ -67,7 +67,11 @@ export const PayoutSettlementsPage = () => {
     setLoading(true);
     try {
       const data = await adminService.fetchFinancialOverview();
-      setFinancialData(data);
+      if (data && !data.error && data.ownerMatrix) {
+        setFinancialData(data);
+      } else if (data?.error) {
+        showToast(data.error, 'error');
+      }
     } catch (e) {
       showToast(t('error_loading'), 'error');
     } finally {
@@ -121,9 +125,21 @@ export const PayoutSettlementsPage = () => {
     }
   };
 
+  const ownerMatrix = financialData?.ownerMatrix || [];
+  const transactions = financialData?.transactions || [];
+  const settlements = financialData?.settlements || [];
+  const kpis = financialData?.kpis || {
+    totalGrossSystemVolume: 0,
+    totalOnlineCollected: 0,
+    totalPlatformRevenue: 0,
+    totalPendingOwnerDues: 0,
+    totalEscrowHeld: 0,
+    totalSettledPayouts: 0,
+  };
+
   // Export to CSV
   const handleExportCSV = () => {
-    if (financialData.ownerMatrix.length === 0) {
+    if (ownerMatrix.length === 0) {
       showToast(t('no_data'), 'warning');
       return;
     }
@@ -137,7 +153,7 @@ export const PayoutSettlementsPage = () => {
       t('settled_payouts_col'),
       t('net_withdrawable_col'),
     ];
-    const rows = financialData.ownerMatrix.map((o) => [
+    const rows = ownerMatrix.map((o) => [
       `"${o.name}"`,
       `"${o.phone}"`,
       `"${o.governorate}"`,
@@ -162,7 +178,7 @@ export const PayoutSettlementsPage = () => {
   };
 
   // Filter owners
-  const filteredOwners = financialData.ownerMatrix.filter((o) => {
+  const filteredOwners = ownerMatrix.filter((o) => {
     const q = search.toLowerCase();
     return (
       (o.name || '').toLowerCase().includes(q) ||
@@ -215,31 +231,31 @@ export const PayoutSettlementsPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           label={t('kpi_online_collected')}
-          value={`${Number(financialData.kpis.totalOnlineCollected || 0).toLocaleString()} ${t('currency')}`}
+          value={`${Number(kpis.totalOnlineCollected || 0).toLocaleString()} ${t('currency')}`}
           icon={Wallet2}
           subtext={t('kpi_online_subtext')}
         />
         <StatCard
           label={t('kpi_pending_dues')}
-          value={`${Number(financialData.kpis.totalPendingOwnerDues || 0).toLocaleString()} ${t('currency')}`}
+          value={`${Number(kpis.totalPendingOwnerDues || 0).toLocaleString()} ${t('currency')}`}
           icon={Clock}
           subtext={t('kpi_pending_subtext')}
         />
         <StatCard
           label={t('kpi_escrow_held')}
-          value={`${Number(financialData.kpis.totalEscrowHeld || 0).toLocaleString()} ${t('currency')}`}
+          value={`${Number(kpis.totalEscrowHeld || 0).toLocaleString()} ${t('currency')}`}
           icon={Clock}
           subtext={t('kpi_escrow_subtext')}
         />
         <StatCard
           label={t('kpi_total_settled')}
-          value={`${Number(financialData.kpis.totalSettledPayouts || 0).toLocaleString()} ${t('currency')}`}
+          value={`${Number(kpis.totalSettledPayouts || 0).toLocaleString()} ${t('currency')}`}
           icon={TickCircle}
           subtext={t('kpi_settled_subtext')}
         />
         <StatCard
           label={t('kpi_platform_commission')}
-          value={`${Number(financialData.kpis.totalPlatformRevenue || 0).toLocaleString()} ${t('currency')}`}
+          value={`${Number(kpis.totalPlatformRevenue || 0).toLocaleString()} ${t('currency')}`}
           icon={DollarCircle}
           subtext={t('kpi_platform_subtext')}
         />

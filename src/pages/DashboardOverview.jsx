@@ -82,11 +82,17 @@ export const DashboardOverview = ({ onNavigate }) => {
         adminService.fetchRecentBookings(20),
       ]);
 
-      setStats(statsData);
-      setRecentBookings(bookingsData || []);
+      if (statsData && !statsData.error && statsData.success !== false) {
+        setStats(statsData);
+      } else if (statsData?.error) {
+        showToast(statsData.error, 'error');
+      }
+
+      setRecentBookings(Array.isArray(bookingsData) ? bookingsData : []);
       setLastSyncTime(new Date());
     } catch (e) {
       console.error('Error loading dashboard data:', e);
+      showToast(t('error_loading'), 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
