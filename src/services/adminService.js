@@ -417,7 +417,7 @@ class AdminService {
     }
   }
 
-  async activateVspPro({ ownerId, days }) {
+  async activateVspPro({ ownerId, days = 30 }) {
     try {
       const { data, error } = await this.client.rpc('admin_set_owner_subscription_atomic', {
         p_owner_id: ownerId,
