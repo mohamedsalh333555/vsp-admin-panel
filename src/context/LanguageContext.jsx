@@ -47,16 +47,16 @@ const translations = {
     processing: 'جاري المعالجة...',
 
     // Sidebar & Navigation
-    dashboard: 'لوحة الإحصائيات المركزية',
-    owner_audits: 'توثيق واعتماد الملاك',
-    owner_subscriptions: 'باقات واشتراكات الملاك',
-    users: 'إدارة المستخدمين والمشرفين',
-    disputes: 'غرفة فض النزاعات والبلاغات',
-    payout_settlements: 'المقاصة والتسويات المالية',
-    league_1v1: 'دوري المواجهات الفردية',
-    tournaments: 'غرفة تحكم البطولات',
-    banners: 'إدارة البنرات والإعلانات',
-    settings: 'الرسائل الجماعية والإعدادات',
+    dashboard: 'الرئيسية',
+    owner_audits: 'طلبات الملاك',
+    owner_subscriptions: 'الاشتراكات',
+    users: 'المستخدمين',
+    disputes: 'النزاعات والبلاغات',
+    payout_settlements: 'المالية والحسابات',
+    league_1v1: 'دوري 1v1',
+    tournaments: 'البطولات',
+    banners: 'الإعلانات والبنرات',
+    settings: 'الإعدادات والإشعارات',
 
     // Dashboard Overview
     total_users: 'إجمالي المستخدمين',
@@ -453,16 +453,16 @@ const translations = {
     processing: 'Processing...',
 
     // Sidebar & Navigation
-    dashboard: 'Central Analytics Dashboard',
-    owner_audits: 'Owner Audits & Verification',
-    owner_subscriptions: 'Owner Pro Subscriptions',
-    users: 'User & Admin Moderation',
-    disputes: 'Dispute Resolution Center',
-    payout_settlements: 'Financial Clearing & Payouts',
-    league_1v1: '1v1 Match League',
-    tournaments: 'Tournament Command Center',
-    banners: 'Banners & Ads Management',
-    settings: 'Broadcast & System Settings',
+    dashboard: 'Dashboard',
+    owner_audits: 'Owner Requests',
+    owner_subscriptions: 'Subscriptions',
+    users: 'Users',
+    disputes: 'Disputes',
+    payout_settlements: 'Finance & Payouts',
+    league_1v1: '1v1 League',
+    tournaments: 'Tournaments',
+    banners: 'Banners & Ads',
+    settings: 'Settings & Alerts',
 
     // Dashboard Overview
     total_users: 'Total Users',
