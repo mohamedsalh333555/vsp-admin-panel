@@ -1149,7 +1149,7 @@ class AdminService {
           prize_pool: 0,
           governorate: governorate || 'Cairo',
           status: 'registration_open',
-          scheduled_at: scheduled_at || new Date(Date.now() + 86400000 * 3).toISOString(),
+          scheduled_at: scheduled_at || null,
           created_by: created_by || null,
         })
         .select()
