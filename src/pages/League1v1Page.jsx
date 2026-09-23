@@ -100,6 +100,11 @@ export const League1v1Page = () => {
  const [deliveryNotesInput, setDeliveryNotesInput] = useState('');
  const [deliveryConfirmedCheckbox, setDeliveryConfirmedCheckbox] = useState(false);
 
+ // Unsaved Changes & Tie-Break Safety State
+ const [isDirty, setIsDirty] = useState(false);
+ const [showPublishConfirmModal, setShowPublishConfirmModal] = useState(false);
+ const [publishConfirmedCheckbox, setPublishConfirmedCheckbox] = useState(false);
+
  // History & Registrations State
  const [historyList, setHistoryList] = useState([]);
  const [registrations, setRegistrations] = useState([]);
@@ -155,8 +160,24 @@ export const League1v1Page = () => {
  };
 
  const handleGovernorateChange = (gov) => {
+  if (isDirty) {
+   if (!window.confirm('⚠️ يوجد درجات وتعديلات غير محفوظة في شيت الرصد الميداني. هل أنت متأكد من تغيير المحافظة وفقدان المسودة الحالية؟')) {
+    return;
+   }
+  }
+  setIsDirty(false);
   setSelectedGovernorate(gov);
   loadData(gov);
+ };
+
+ const handleTabChange = (newTab) => {
+  if (isDirty && activeTab === 'live') {
+   if (!window.confirm('⚠️ يوجد درجات وتعديلات غير محفوظة في شيت الرصد الميداني. هل أنت متأكد من مغادرة الشاشة وفقدان المسودة الحالية؟')) {
+    return;
+   }
+  }
+  setIsDirty(false);
+  setActiveTab(newTab);
  };
 
  useEffect(() => {
@@ -250,49 +271,51 @@ export const League1v1Page = () => {
  // 2. LIVE SCORING SHEET ROW ACTIONS
  // -------------------------------------------------------------------------
  const handlePlayerChange = (index, field, value) => {
- setPlayers((prev) => {
- const updated = [...prev];
- const row = { ...updated[index] };
+  setIsDirty(true);
+  setPlayers((prev) => {
+  const updated = [...prev];
+  const row = { ...updated[index] };
 
- if (field === 'player_name') {
- row.player_name = value;
- row.name = value;
- } else if (field === 'round_reached') {
- row.round_reached = value || '';
- } else {
- const numVal = Math.max(0, parseInt(value) || 0);
- row[field] = numVal;
- if (field === 'skills') row.skill_points = numVal;
- }
+  if (field === 'player_name') {
+  row.player_name = value;
+  row.name = value;
+  } else if (field === 'round_reached') {
+  row.round_reached = value || '';
+  } else {
+  const numVal = Math.max(0, parseInt(value) || 0);
+  row[field] = numVal;
+  if (field === 'skills') row.skill_points = numVal;
+  }
 
- // Compute total_points live in frontend
- const t = Number(row.tackles) || 0;
- const g = Number(row.goals) || 0;
- const s = Number(row.skills ?? row.skill_points) || 0;
- row.total_points = t + g + s;
+  // Compute total_points live in frontend
+  const t = Number(row.tackles) || 0;
+  const g = Number(row.goals) || 0;
+  const s = Number(row.skills ?? row.skill_points) || 0;
+  row.total_points = t + g + s;
 
- updated[index] = row;
- return updated;
- });
+  updated[index] = row;
+  return updated;
+  });
  };
 
  const handleAddPlayerRow = () => {
- setPlayers((prev) => [
- ...prev,
- {
- id: `temp_${Date.now()}_${prev.length}`,
- player_name: `لاعب #${prev.length + 1}`,
- name: `لاعب #${prev.length + 1}`,
- tackles: 0,
- goals: 0,
- skills: 0,
- skill_points: 0,
- total_points: 0,
- round_reached: '',
- user_id: null,
- avatar_url: '',
- },
- ]);
+  setIsDirty(true);
+  setPlayers((prev) => [
+  ...prev,
+  {
+  id: `temp_${Date.now()}_${prev.length}`,
+  player_name: `لاعب #${prev.length + 1}`,
+  name: `لاعب #${prev.length + 1}`,
+  tackles: 0,
+  goals: 0,
+  skills: 0,
+  skill_points: 0,
+  total_points: 0,
+  round_reached: '',
+  user_id: null,
+  avatar_url: '',
+  },
+  ]);
  };
 
   const handleDeletePlayerRow = (index) => {
@@ -303,6 +326,7 @@ export const League1v1Page = () => {
     if (!window.confirm('هل أنت متأكد من حذف هذا اللاعب؟')) {
       return;
     }
+    setIsDirty(true);
     setPlayers((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -385,6 +409,7 @@ export const League1v1Page = () => {
       const res = await adminService.save1v1TournamentPlayers(activeTournament.id, cleanPlayers);
       if (!res.success) throw new Error(res.error || 'فشل حفظ المسودة');
 
+      setIsDirty(false);
       setAlert({ type: 'success', message: 'تم حفظ مسودة درجات اللاعبين بنجاح! 💾' });
     } catch (e) {
       console.error('Error saving draft:', e);
@@ -395,23 +420,35 @@ export const League1v1Page = () => {
   };
 
   // -------------------------------------------------------------------------
-  // 4. PUBLISH TOURNAMENT (نشر الترتيب ذرياً مع آلية Rollback تلقائية)
+  // 4. PUBLISH TOURNAMENT (فتح نافذة التأكيد المحمية والنشر الذري)
   // -------------------------------------------------------------------------
-  const handlePublishTournament = async () => {
+  const handleInitiatePublish = () => {
     if (!activeTournament?.id) {
       setAlert({ type: 'error', message: 'لا توجد بطولة نشطة للنشر.' });
       return;
     }
+    if (players.length < 2) {
+      setAlert({ type: 'error', message: 'يجب أن تحتوي البطولة على لاعبين اثنين على الأقل لنشر النتائج.' });
+      return;
+    }
+    if (hasTopTie) {
+      setAlert({
+        type: 'error',
+        message: '⚠️ لا يمكن اعتماد ونشر النتائج لوجود تعادل في المركز الأول! يرجى حسم التعادل وتعديل النقاط أولاً.',
+      });
+      return;
+    }
+    setPublishConfirmedCheckbox(false);
+    setShowPublishConfirmModal(true);
+  };
 
-    const confirmMsg = `هل أنت متأكد من رغبتك في نشر الترتيب النهائي للبطولة (${activeTournament.name})؟\n\nسيتم أرشفة أي بطولة سابقة ونشر هذا الترتيب فوراً على تطبيق الموبايل لجميع اللاعبين!`;
-    if (!window.confirm(confirmMsg)) return;
-
+  const handleExecutePublish = async () => {
+    if (!activeTournament?.id) return;
     const previousStatus = activeTournament.status || 'registration_open';
 
     try {
       setProcessing(true);
 
-      // تنقية بيانات اللاعبين والترتيب التلقائي للأعلى نقاطاً
       const cleanPlayers = players.map((p, idx) => ({
         player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
         user_id: p.user_id || null,
@@ -422,7 +459,6 @@ export const League1v1Page = () => {
         round_reached: p.round_reached ? p.round_reached.trim() : null,
       }));
 
-      // استدعاء الحفظ والنشر الذري مع آلية Rollback
       const pubRes = await adminService.saveAndPublish1v1Tournament({
         tournamentId: activeTournament.id,
         playersList: cleanPlayers,
@@ -433,12 +469,13 @@ export const League1v1Page = () => {
         throw new Error(pubRes.error || 'فشل نشر البطولة');
       }
 
+      setIsDirty(false);
+      setShowPublishConfirmModal(false);
       setAlert({
         type: 'success',
         message: '🚀 تم حفظ ونشر الترتيب النهائي بنجاح! الترتيب معروض الآن مباشرة على هواتف اللاعبين.',
       });
 
-      // Reload updated tournament and players
       await loadData();
     } catch (e) {
       console.error('Error publishing tournament:', e);
@@ -475,6 +512,15 @@ export const League1v1Page = () => {
  const ptB = (Number(b.tackles) || 0) + (Number(b.goals) || 0) + (Number(b.skills ?? b.skill_points) || 0);
  return ptB - ptA;
  });
+
+ const getPlayerScore = (p) => {
+  if (!p) return 0;
+  return (Number(p.tackles) || 0) + (Number(p.goals) || 0) + (Number(p.skills ?? p.skill_points) || 0);
+ };
+
+ const hasTopTie = sortedPlayersPreview.length >= 2 &&
+  getPlayerScore(sortedPlayersPreview[0]) > 0 &&
+  getPlayerScore(sortedPlayersPreview[0]) === getPlayerScore(sortedPlayersPreview[1]);
 
  return (
  <div className="p-6 space-y-6 text-right max-w-7xl mx-auto" dir="rtl">
@@ -548,7 +594,7 @@ export const League1v1Page = () => {
  {/* ==================================================================== */}
  <div className="flex border-b border-vsp-border gap-2">
  <button
- onClick={() => setActiveTab('live')}
+ onClick={() => handleTabChange('live')}
  className={`pb-3 px-4 text-xs font-bold flex items-center gap-2 transition-all relative ${
  activeTab === 'live'
  ? 'text-vsp-accent border-b-2 border-vsp-accent'
@@ -556,14 +602,14 @@ export const League1v1Page = () => {
  }`}
  >
  <Cup className="w-4 h-4" variant="Outline" />
- <span>شيت الرصد والبطولة الحالية</span>
+ <span>البطولة الجارية والرصد (Live)</span>
  {activeTournament?.status === 'published' && (
  <span className="w-2 h-2 rounded-full bg-vsp-accent animate-pulse"></span>
  )}
  </button>
 
  <button
- onClick={() => setActiveTab('history')}
+ onClick={() => handleTabChange('history')}
  className={`pb-3 px-4 text-xs font-bold flex items-center gap-2 transition-all relative ${
  activeTab === 'history'
  ? 'text-vsp-accent border-b-2 border-vsp-accent'
@@ -575,7 +621,7 @@ export const League1v1Page = () => {
  </button>
 
  <button
- onClick={() => setActiveTab('registrations')}
+ onClick={() => handleTabChange('registrations')}
  className={`pb-3 px-4 text-xs font-bold flex items-center gap-2 transition-all relative ${
  activeTab === 'registrations'
  ? 'text-vsp-accent border-b-2 border-vsp-accent'
@@ -757,16 +803,21 @@ export const League1v1Page = () => {
  </button>
 
  <button
- onClick={handlePublishTournament}
- disabled={processing}
- className="flex items-center gap-2 px-6 py-2.5 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
+ onClick={handleInitiatePublish}
+ disabled={processing || hasTopTie || players.length < 2}
+ title={hasTopTie ? 'يجب حسم التعادل في المركز الأول أولاً' : ''}
+ className={`flex items-center gap-2 px-6 py-2.5 font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 ${
+  hasTopTie || players.length < 2
+   ? 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-75'
+   : 'bg-zinc-100 hover:bg-white text-black'
+ }`}
  >
  {processing ? (
  <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />
  ) : (
  <Send2 className="w-4 h-4" variant="Outline" />
  )}
- <span>حفظ ونشر الترتيب النهائي </span>
+ <span>حفظ ونشر الترتيب النهائي</span>
  </button>
  </div>
  </div>
@@ -906,6 +957,18 @@ export const League1v1Page = () => {
  <span>إضافة لاعب إضافي</span>
  </button>
  </div>
+
+ {/* Tie-Break Critical Alert */}
+ {hasTopTie && (
+ <div className="p-4 bg-amber-500/15 border-2 border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 text-amber-300 shadow-lg">
+ <div className="flex items-center gap-3 text-xs font-bold leading-relaxed">
+ <Warning2 className="w-5 h-5 text-amber-400 flex-shrink-0 animate-pulse" variant="Outline" />
+ <span>
+ ⚠️ تنبيه حرج (تعادل في المركز الأول): اللاعبان <strong className="text-white">"{sortedPlayersPreview[0]?.player_name}"</strong> و <strong className="text-white">"{sortedPlayersPreview[1]?.player_name}"</strong> متعادلان برصيد ({getPlayerScore(sortedPlayersPreview[0])} نقطة)! يرجى حسم التعادل وتعديل النقاط لتحديد البطل قبل إتاحة اعتماد ونشر الترتيب.
+ </span>
+ </div>
+ </div>
+ )}
 
  {/* Live Bulk Scoring Table */}
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
@@ -1086,7 +1149,7 @@ export const League1v1Page = () => {
        <th className="px-6 py-4 font-bold text-center">الحالة</th>
        <th className="px-6 py-4 font-bold text-center">العدد المستهدف</th>
        <th className="px-6 py-4 font-bold">تاريخ الإنشاء</th>
-       <th className="px-6 py-4 font-bold">تاريخ النشر</th>
+       <th className="px-6 py-4 font-bold">تاريخ اعتماد النتائج</th>
        <th className="px-6 py-4 font-bold text-center">الإجراءات</th>
       </tr>
      </thead>
@@ -1103,17 +1166,21 @@ export const League1v1Page = () => {
          </span>
         </td>
         <td className="px-6 py-4 text-center">
-         {item.status === 'published' ? (
+         {item.prize_delivered ? (
           <Badge variant="accent" size="xs">
-           منشورة حالياً 
+           مكتملة ومُسلّمة الجائزة 🏅
+          </Badge>
+         ) : item.status === 'published' ? (
+          <Badge variant="warning" size="xs">
+           منشورة حالياً
           </Badge>
          ) : item.status === 'draft' ? (
           <Badge variant="warning" size="xs">
-           مسودة 
+           مسودة
           </Badge>
          ) : (
           <Badge variant="default" size="xs">
-           مؤرشفة 
+           مؤرشفة
           </Badge>
          )}
         </td>
@@ -1431,6 +1498,100 @@ export const League1v1Page = () => {
  </div>
  </div>
  </Modal>
+
+ {/* ==================================================================== */}
+ {/* MODAL: PUBLISH CONFIRMATION GUARD */}
+ {/* ==================================================================== */}
+ {showPublishConfirmModal && activeTournament && (
+ <Modal
+ isOpen={showPublishConfirmModal}
+ onClose={() => setShowPublishConfirmModal(false)}
+ title="اعتماد ونشر الترتيب النهائي للبطولة"
+ >
+ <div className="space-y-5 text-right" dir="rtl">
+ <div className="p-4 bg-vsp-card border border-vsp-border rounded-xl space-y-2.5">
+ <div className="flex justify-between items-center text-xs">
+ <span className="text-zinc-400">البطولة والمحافظة:</span>
+ <span className="font-bold text-white">{activeTournament.name} ({getGovArabicName(activeTournament.governorate)})</span>
+ </div>
+ <div className="flex justify-between items-center text-xs">
+ <span className="text-zinc-400">البطل المتوج بالمركز الأول:</span>
+ <span className="font-black text-vsp-accent flex items-center gap-1.5">
+ <Award className="w-4 h-4 text-vsp-accent" variant="Outline" />
+ {sortedPlayersPreview[0]?.player_name} ({getPlayerScore(sortedPlayersPreview[0])} نقطة)
+ </span>
+ </div>
+ <div className="flex justify-between items-center text-xs">
+ <span className="text-zinc-400">وعاء الجائزة المالية:</span>
+ <span className="font-black text-white">{activeTournament.prize_pool || 0} ج.م</span>
+ </div>
+ <div className="flex justify-between items-center text-xs">
+ <span className="text-zinc-400">إجمالي اللاعبين المرصودين:</span>
+ <span className="font-bold text-zinc-300">{players.length} لاعبين</span>
+ </div>
+ </div>
+
+ <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-300 space-y-1">
+ <p className="font-bold flex items-center gap-1.5">
+ <Warning2 className="w-4 h-4 text-red-400" variant="Outline" />
+ تحذير تشغيلي نهائي:
+ </p>
+ <p className="text-[11px] leading-relaxed text-zinc-300">
+ النشر سيقوم فوراً بأرشفة البطولة، وتحديث نقاط اللاعبين في تطبيق الموبايل، وتتويج البطل رسمياً في لوحة الشرف. هذا الإجراء نهائي ولا يمكن التراجع عنه.
+ </p>
+ </div>
+
+ <label className="flex items-center gap-2.5 p-3 bg-vsp-card/70 border border-vsp-border rounded-xl cursor-pointer select-none">
+ <input
+ type="checkbox"
+ checked={publishConfirmedCheckbox}
+ onChange={(e) => setPublishConfirmedCheckbox(e.target.checked)}
+ className="w-4 h-4 accent-vsp-accent rounded cursor-pointer"
+ />
+ <span className="text-xs font-bold text-white leading-relaxed">
+ أقر بأن درجات جميع اللاعبين مطابقة لشيت التحكيم الورقي، وأؤكد اعتماد ونشر النتائج.
+ </span>
+ </label>
+
+ <div className="flex items-center justify-end gap-3 pt-2">
+ <button
+ type="button"
+ onClick={() => setShowPublishConfirmModal(false)}
+ className="px-4 py-2 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-zinc-300 text-xs font-bold rounded-xl transition-colors"
+ >
+ إلغاء وتدقيق الدرجات
+ </button>
+ <button
+ type="button"
+ disabled={!publishConfirmedCheckbox || processing}
+ onClick={handleExecutePublish}
+ className="flex items-center gap-2 px-6 py-2.5 bg-vsp-accent hover:bg-vsp-accentHover disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-black rounded-xl shadow-lg transition-all active:scale-95"
+ >
+ {processing ? <RotateRight className="w-4 h-4 animate-spin" /> : <Send2 className="w-4 h-4" />}
+ <span>نشر النتائج على الموبايل فوراً 🚀</span>
+ </button>
+ </div>
+ </div>
+ </Modal>
+ )}
+
+ {/* Floating Unsaved Changes Warning Bar */}
+ {isDirty && (
+ <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-900/95 border-2 border-vsp-accent/50 text-white px-6 py-3 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
+ <div className="flex items-center gap-2 text-xs font-bold text-vsp-accent">
+ <Warning2 className="w-4 h-4 text-vsp-accent animate-pulse" variant="Outline" />
+ <span>يوجد درجات وتعديلات غير محفوظة في شيت الرصد الميداني!</span>
+ </div>
+ <button
+ type="button"
+ onClick={handleSaveDraft}
+ disabled={processing}
+ className="px-4 py-1.5 bg-vsp-accent hover:bg-vsp-accentHover text-black text-xs font-black rounded-xl transition-all shadow-md active:scale-95"
+ >
+ حفظ كمسودة الآن 💾
+ </button>
+ </div>
+ )}
  </div>
  );
 };

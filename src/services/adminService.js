@@ -1349,21 +1349,7 @@ class AdminService {
       let tournament = activeList && activeList.length > 0 ? activeList[0] : null;
 
       if (!tournament) {
-        // Fallback to latest archived in this governorate (or overall)
-        let archQuery = this.client
-          .from('vsp_1v1_tournaments')
-          .select('*');
-        if (governorate) {
-          archQuery = archQuery.eq('governorate', governorate);
-        }
-        const { data: archivedList, error: aErr } = await archQuery
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (aErr) throw aErr;
-        tournament = archivedList && archivedList.length > 0 ? archivedList[0] : null;
-      }
-
-      if (!tournament) {
+        // إذا لم تكن هناك بطولة نشطة، لا نسحب بطولة مؤرشفة لتجنب تعديل الأرشيف التاريخي
         return { success: true, tournament: null, players: [] };
       }
 
