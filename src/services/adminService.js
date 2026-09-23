@@ -619,51 +619,36 @@ class AdminService {
   }
   async resolveDispute({
     bookingId,
-    winnerOutcome = 'home_win', // 'home_win' | 'away_win' | 'draw' | 'cancelled'
+    winnerOutcome = 'home_win',
     resolutionNotes = '',
     homeScore = null,
     awayScore = null,
   }) {
     try {
-      // 🔒 Strict Security: Atomic RPC only, no direct table fallback
       const { data, error } = await this.client.rpc('admin_resolve_dispute_atomic', {
         p_booking_id: bookingId,
         p_final_outcome: winnerOutcome,
       });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || data?.error || 'فشل فض النزاع');
 
-      if (error) {
-        console.error('[AdminService] admin_resolve_dispute_atomic failed:', error);
-        throw new Error(`فشل فض النزاع: ${error.message}`);
+      const bookingUpdates = {};
+      if (resolutionNotes) bookingUpdates.dispute_notes = resolutionNotes;
+      if (homeScore !== null && homeScore !== undefined && String(homeScore).trim() !== '') {
+        bookingUpdates.home_team_score = Number(homeScore);
+        bookingUpdates.host_score = Number(homeScore);
       }
-
-      if (data && data.success === false) {
-        throw new Error(`فشل فض النزاع: ${data.message || data.error || 'خطأ غير معروف'}`);
+      if (awayScore !== null && awayScore !== undefined && String(awayScore).trim() !== '') {
+        bookingUpdates.away_team_score = Number(awayScore);
+        bookingUpdates.away_score = Number(awayScore);
       }
-
-      // توثيق وحفظ ملاحظات الحكم والأهداف وقرار الاسترداد في سجل الحجز
-      try {
-        const bookingUpdates = {
-          updated_at: new Date().toISOString(),
-        };
-        if (resolutionNotes) {
-          bookingUpdates.dispute_notes = resolutionNotes;
-        }
-        if (homeScore !== null && homeScore !== undefined && String(homeScore).trim() !== '') {
-          bookingUpdates.home_team_score = Number(homeScore);
-          bookingUpdates.host_score = Number(homeScore);
-        }
-        if (awayScore !== null && awayScore !== undefined && String(awayScore).trim() !== '') {
-          bookingUpdates.away_team_score = Number(awayScore);
-          bookingUpdates.away_score = Number(awayScore);
-        }
-        if (winnerOutcome === 'cancelled') {
-          bookingUpdates.status = 'cancelled';
-          bookingUpdates.cancellation_reason = resolutionNotes ? `ملغي بقرار فض النزاع: ${resolutionNotes}` : 'ملغي بقرار إدارة المنظومة وفض النزاع (استرداد العربون)';
-          bookingUpdates.cancelled_at = new Date().toISOString();
-        }
-        await this.client.from('bookings').update(bookingUpdates).eq('id', bookingId);
-      } catch (noteErr) {
-        console.warn('Booking dispute details update note:', noteErr);
+      if (Object.keys(bookingUpdates).length > 0) {
+        const { data: detailData, error: detailError } = await this.client.rpc('admin_update_booking_safe_atomic', {
+          p_booking_id: bookingId,
+          p_updates: bookingUpdates,
+        });
+        if (detailError) throw detailError;
+        if (!detailData?.success) throw new Error(detailData?.error || 'فشل حفظ تفاصيل فض النزاع');
       }
 
       return { success: true, data };
@@ -673,7 +658,6 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async fetchReports() {
     try {
       const { data, error } = await this.client
@@ -839,48 +823,19 @@ class AdminService {
 
   async publish1v1Standings(playersList) {
     try {
-      // 1. Clear current standings
-      await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
-
-      // 2. Sort players by total points desc
-      const sorted = [...playersList].sort((a, b) => {
-        const ptA = (Number(a.tackles) || 0) + (Number(a.goals) || 0) + (Number(a.skill_points) || 0);
-        const ptB = (Number(b.tackles) || 0) + (Number(b.goals) || 0) + (Number(b.skill_points) || 0);
-        return ptB - ptA;
+      if (!Array.isArray(playersList)) throw new Error('بيانات اللاعبين غير صالحة');
+      const { data, error } = await this.client.rpc('admin_publish_legacy_1v1_standings_atomic', {
+        p_players: playersList,
       });
-
-      // 3. Format rows
-      const formatted = sorted.map((p, idx) => {
-        const tackles = Math.max(0, parseInt(p.tackles) || 0);
-        const goals = Math.max(0, parseInt(p.goals) || 0);
-        const skills = Math.max(0, parseInt(p.skill_points) || 0);
-        const total = tackles + goals + skills;
-        return {
-          name: p.name?.trim() || `لاعب #${idx + 1}`,
-          avatar_url: p.avatar_url || '',
-          tackles: tackles,
-          goals: goals,
-          skill_points: skills,
-          total_points: total,
-          titles: Number(p.titles) || (p.round_reached === 'champion' ? 1 : 0),
-          trend: p.round_reached === 'champion' ? 'up' : 'stable',
-          round_reached: p.round_reached ? p.round_reached.trim() : null,
-        };
-      });
-
-      if (formatted.length > 0) {
-        const { error } = await this.client.from('vsp_1vs1_players').insert(formatted);
-        if (error) throw error;
-      }
-
-      return { success: true };
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل نشر جدول 1v1');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in publish1v1Standings:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-
   async wipe1v1TournamentData() {
     try {
       const { data, error } = await this.client.rpc('admin_wipe_1v1_data_atomic');
