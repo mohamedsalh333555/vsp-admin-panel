@@ -455,48 +455,35 @@ class AdminService {
     phone,
     email,
     stadiumName,
-    governorate = 'القاهرة',
-    pricePerHour = 350,
+    governorate,
+    pricePerHour,
   }) {
     try {
-      // 1. Insert user
-      const { data: userRes, error: userErr } = await this.client
-        .from('users')
-        .insert({
-          name,
-          phone,
-          email,
-          role: 'owner',
-          verification_status: 'approved',
-          is_identity_verified: true,
-          governorate,
-          is_blocked: false,
-        })
-        .select()
-        .single();
+      if (!name?.trim() || !phone?.trim() || !stadiumName?.trim() ||
+          !governorate?.trim() || !Number.isFinite(Number(pricePerHour)) ||
+          Number(pricePerHour) <= 0) {
+        return { success: false, error: 'بيانات مالك الملعب والملعب غير مكتملة أو غير صالحة.' };
+      }
 
-      if (userErr) throw userErr;
+      const { data, error } = await this.client.rpc('admin_create_owner_with_stadium_atomic', {
+        p_name: name.trim(),
+        p_phone: phone.trim(),
+        p_email: email?.trim() || null,
+        p_stadium_name: stadiumName.trim(),
+        p_governorate: governorate.trim(),
+        p_price_per_hour: Number(pricePerHour),
+      });
 
-      // 2. Insert stadium
-      const { error: stadiumErr } = await this.client
-        .from('stadiums')
-        .insert({
-          owner_id: userRes.id,
-          name: stadiumName,
-          governorate,
-          price_per_hour: Number(pricePerHour),
-          is_verified: true,
-          is_blocked: false,
-        });
-
-      if (stadiumErr) throw stadiumErr;
-      return { success: true, user: userRes };
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل إنشاء المالك والملعب');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in createOwnerAndStadiumManually:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
+
 
   // =========================================================================
   // MODULE C: USERS & MODERATION
@@ -1136,38 +1123,32 @@ class AdminService {
   // MODULE F.2: VSP 1v1 TOURNAMENT SYSTEM (NEW TABLES & ATOMIC RPC)
   // =========================================================================
 
-  async create1v1Tournament({ name, target_player_count, entry_fee = 0, scheduled_at = null, created_by = null, governorate = 'Cairo' }) {
+  async create1v1Tournament({ name, target_player_count, entry_fee, scheduled_at = null, governorate }) {
     try {
-      const { data, error } = await this.client
-        .from('vsp_1v1_tournaments')
-        .insert({
-          name: name?.trim() || 'بطولة 1vs1 جديدة',
-          target_player_count: parseInt(target_player_count) || 8,
-          entry_fee: parseFloat(entry_fee) || 0,
-          prize_pool: 0,
-          governorate: governorate || 'Cairo',
-          status: 'registration_open',
-          scheduled_at: scheduled_at || null,
-          created_by: created_by || null,
-        })
-        .select()
-        .single();
+      if (!name?.trim() || !governorate?.trim() ||
+          !Number.isFinite(Number(target_player_count)) ||
+          !Number.isFinite(Number(entry_fee))) {
+        return { success: false, error: 'بيانات البطولة غير مكتملة أو غير صالحة.' };
+      }
+
+      const { data, error } = await this.client.rpc('admin_create_1v1_tournament_atomic', {
+        p_name: name.trim(),
+        p_target_player_count: Number(target_player_count),
+        p_entry_fee: Number(entry_fee),
+        p_scheduled_at: scheduled_at || null,
+        p_governorate: governorate.trim(),
+      });
 
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل إنشاء البطولة');
       return { success: true, data };
     } catch (e) {
       console.error('Error creating 1v1 tournament:', e);
       const err = classifyError(e);
-      if (e?.code === '23505' || e?.message?.includes('idx_one_active_1v1_tournament_per_governorate') || e?.message?.includes('unique constraint')) {
-        return { 
-          success: false, 
-          error: 'يوجد بطولة نشطة حالياً في هذه المحافظة (' + governorate + '). يجب إنهاء أو أرشفة البطولة الحالية أولاً قبل بدء بطولة جديدة لنفس المحافظة.', 
-          errorType: 'conflict' 
-        };
-      }
       return { success: false, error: err.message, errorType: err.type };
     }
   }
+
 
   async mark1v1PrizeDelivered(tournamentId, notes = '') {
     try {
@@ -1187,35 +1168,26 @@ class AdminService {
 
   async save1v1TournamentPlayers(tournamentId, playersList) {
     try {
-      if (!tournamentId) throw new Error('Missing tournament ID');
-
-      // Delete existing player records for this tournament to re-insert cleanly
-      const { error: delErr } = await this.client
-        .from('vsp_1v1_tournament_players')
-        .delete()
-        .eq('tournament_id', tournamentId);
-      if (delErr) throw delErr;
-
-      const formatted = playersList.map((p, idx) => ({
-        tournament_id: tournamentId,
-        player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
-        user_id: p.user_id || null,
-        avatar_url: p.avatar_url || null,
-        tackles: Math.max(0, parseInt(p.tackles) || 0),
-        goals: Math.max(0, parseInt(p.goals) || 0),
-        skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
-        round_reached: p.round_reached ? p.round_reached.trim() : null,
-        // NOTE: total_points is GENERATED ALWAYS AS by PostgreSQL, DO NOT SEND!
-      }));
-
-      if (formatted.length > 0) {
-        const { error: insErr } = await this.client
-          .from('vsp_1v1_tournament_players')
-          .insert(formatted);
-        if (insErr) throw insErr;
+      if (!tournamentId || !Array.isArray(playersList)) {
+        return { success: false, error: 'بيانات لاعبي البطولة غير صالحة.' };
       }
 
-      return { success: true };
+      const { data, error } = await this.client.rpc('admin_save_1v1_tournament_players_atomic', {
+        p_tournament_id: tournamentId,
+        p_players: playersList.map((p) => ({
+          player_name: String(p.player_name || p.name || '').trim(),
+          user_id: p.user_id || null,
+          avatar_url: p.avatar_url || null,
+          tackles: Math.max(0, Number(p.tackles) || 0),
+          goals: Math.max(0, Number(p.goals) || 0),
+          skills: Math.max(0, Number(p.skills ?? p.skill_points) || 0),
+          round_reached: p.round_reached ? String(p.round_reached).trim() : null,
+        })),
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل حفظ لاعبي البطولة');
+      return { success: true, data };
     } catch (e) {
       console.error('Error saving 1v1 tournament players:', e);
       const err = classifyError(e);
@@ -1223,52 +1195,6 @@ class AdminService {
     }
   }
 
-  async update1v1TournamentStatus(tournamentId, status) {
-    try {
-      const { error } = await this.client
-        .from('vsp_1v1_tournaments')
-        .update({ status })
-        .eq('id', tournamentId);
-      if (error) throw error;
-      return { success: true };
-    } catch (e) {
-      console.error('Error updating 1v1 status:', e);
-      return { success: false, error: e.message };
-    }
-  }
-
-  async saveAndPublish1v1Tournament({ tournamentId, playersList }) {
-    try {
-      if (!tournamentId) throw new Error('Missing tournament ID');
-      const { data, error } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
-        p_tournament_id: tournamentId,
-        p_players: playersList,
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'فشل النشر الذري لنتائج البطولة');
-      return { success: true, data };
-    } catch (e) {
-      console.error('Error in saveAndPublish1v1Tournament:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-  async publish1v1Tournament(tournamentId) {
-    try {
-      if (!tournamentId) throw new Error('Missing tournament ID');
-      const { data, error } = await this.client.rpc('publish_1v1_final_standings_atomic', {
-        p_tournament_id: tournamentId,
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'فشل نشر البطولة');
-      return { success: true, data };
-    } catch (e) {
-      console.error('Error publishing 1v1 tournament:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
 
   async getActiveOrLatest1v1Tournament(governorate = null) {
     try {
