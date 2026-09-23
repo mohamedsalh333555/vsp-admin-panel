@@ -53,7 +53,7 @@ class AdminService {
       const pendingOwnersCount = Array.isArray(pendingOwners) ? pendingOwners.length : 0;
       const bookingRows = bookingsRes.data || [];
       const validBookings = bookingRows.filter((b) => b.status === 'confirmed' || b.status === 'completed' || b.status === 'paid');
-      const totalRevenue = validBookings.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+      const totalRevenue = Number(financialOverview.kpis.totalGrossSystemVolume || 0);
 
       return {
         totalUsers: usersRes.count ?? 0,
@@ -139,7 +139,7 @@ class AdminService {
       }));
     } catch (e) {
       console.error('Error fetching recent bookings:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -413,7 +413,7 @@ class AdminService {
       });
     } catch (e) {
       console.error('Error in fetchOwnersWithSubscriptions:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -531,7 +531,7 @@ class AdminService {
       return data || [];
     } catch (e) {
       console.error('Error in fetchAllUsers:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -663,7 +663,7 @@ class AdminService {
       return data || [];
     } catch (e) {
       console.error('Error in fetchChampionships:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -700,7 +700,7 @@ class AdminService {
       return data || [];
     } catch (e) {
       console.error('Error fetching tournament matches:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -785,7 +785,7 @@ class AdminService {
       return data || [];
     } catch (e) {
       console.error('Error in fetchDisputedBookings:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -857,7 +857,7 @@ class AdminService {
       return data || [];
     } catch (e) {
       console.error('Error in fetchReports:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -875,7 +875,7 @@ class AdminService {
       return data || [];
     } catch (e) {
       console.error('Error in fetch1v1LeaguePlayers:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -900,7 +900,7 @@ class AdminService {
       return fallback.data || [];
     } catch (e) {
       console.error('Error in fetch1v1PendingRegistrations:', e);
-      return [];
+      throw e;
     }
   }
 
@@ -914,7 +914,7 @@ class AdminService {
       if (error) throw error;
       return count || 0;
     } catch (e) {
-      return 0;
+      throw e;
     }
   }
 
@@ -928,19 +928,17 @@ class AdminService {
       if (data && data.vsp_1v1_is_open !== undefined) {
         return Boolean(data.vsp_1v1_is_open);
       }
-      return true;
-    } catch (_) {
-      return true;
+      throw new Error('VSP 1v1 registration gate is unavailable in Supabase.');
+    } catch (e) {
+      throw e;
     }
   }
 
   async set1v1RegistrationOpenStatus(isOpen) {
     try {
-      const { error } = await this.client
-        .from('app_config')
-        .upsert({ id: 1, vsp_1v1_is_open: isOpen, updated_at: new Date().toISOString() });
-
+      const { data, error } = await this.client.rpc('admin_set_1v1_registration_open_atomic', { p_is_open: Boolean(isOpen) });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث بوابة التسجيل');
       return { success: true };
     } catch (e) {
       console.error('Error setting 1v1 gate status:', e);
@@ -1239,48 +1237,16 @@ class AdminService {
     }
   }
 
-  async saveAndPublish1v1Tournament({ tournamentId, playersList, fallbackStatus = 'registration_open' }) {
+  async saveAndPublish1v1Tournament({ tournamentId, playersList }) {
     try {
       if (!tournamentId) throw new Error('Missing tournament ID');
-
-      // 1. Try single atomic RPC if implemented on Supabase
-      try {
-        const { data: atomicData, error: atomicErr } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
-          p_tournament_id: tournamentId,
-          p_players: playersList,
-        });
-        if (atomicErr) {
-          if (atomicErr.message?.includes('MISSING_CHAMPION') || atomicErr.message?.includes('MULTIPLE_CHAMPIONS')) {
-            return { success: false, error: atomicErr.message };
-          }
-          console.warn('RPC atomic failed, falling back:', atomicErr);
-        } else if (atomicData?.success) {
-          return { success: true, data: atomicData };
-        }
-      } catch (rpcErr) {
-        if (rpcErr.message?.includes('MISSING_CHAMPION') || rpcErr.message?.includes('MULTIPLE_CHAMPIONS')) {
-          return { success: false, error: rpcErr.message };
-        }
-        // Fall back to 2-step transaction below
-      }
-
-      // 2. Fallback: 2-step transaction with manual rollback
-      // Step A: Save players
-      const saveRes = await this.save1v1TournamentPlayers(tournamentId, playersList);
-      if (!saveRes.success) {
-        throw new Error(saveRes.error || 'فشل حفظ بيانات درجات اللاعبين');
-      }
-
-      // Step B: Publish tournament
-      const pubRes = await this.publish1v1Tournament(tournamentId);
-      if (!pubRes.success) {
-        // Rollback status to previous status
-        console.warn('Publish failed, executing status rollback to:', fallbackStatus);
-        await this.update1v1TournamentStatus(tournamentId, fallbackStatus);
-        throw new Error(pubRes.error || 'فشل نشر الترتيب النهائي، وتم التراجع عن حالة البطولة');
-      }
-
-      return { success: true, data: pubRes.data };
+      const { data, error } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
+        p_tournament_id: tournamentId,
+        p_players: playersList,
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل النشر الذري لنتائج البطولة');
+      return { success: true, data };
     } catch (e) {
       console.error('Error in saveAndPublish1v1Tournament:', e);
       const err = classifyError(e);
@@ -1291,25 +1257,11 @@ class AdminService {
   async publish1v1Tournament(tournamentId) {
     try {
       if (!tournamentId) throw new Error('Missing tournament ID');
-
-      // Call new final standings RPC
       const { data, error } = await this.client.rpc('publish_1v1_final_standings_atomic', {
         p_tournament_id: tournamentId,
       });
-      if (error) {
-        // Fallback to publish_1v1_tournament_atomic
-        const fb = await this.client.rpc('publish_1v1_tournament_atomic', {
-          p_tournament_id: tournamentId,
-        });
-        if (fb.error) throw fb.error;
-        return { success: true, data: fb.data };
-      }
-
       if (error) throw error;
-      if (!data?.success) {
-        throw new Error(data?.error || 'فشل نشر البطولة');
-      }
-
+      if (!data?.success) throw new Error(data?.error || 'فشل نشر البطولة');
       return { success: true, data };
     } catch (e) {
       console.error('Error publishing 1v1 tournament:', e);
@@ -1461,7 +1413,7 @@ class AdminService {
           }));
 
         // Authoritative values from PostgreSQL View
-        const completedOnlineRevenue = Number(recon.total_online_revenue || 0);
+        const completedOnlineRevenue = Number(recon.completed_online_revenue || 0);
         const platformCommission = Number(recon.total_platform_commission || 0);
         const gatewayFees = Number(recon.total_gateway_fees || 0);
         const totalPaidOut = Number(recon.total_withdrawn || 0);
@@ -1471,11 +1423,11 @@ class AdminService {
         const completedBookingsCount = Number(recon.completed_bookings_count || recon.active_bookings_count || 0);
 
         // Escrow held from upcoming confirmed bookings
-        const escrowHeld = upcomingBookings.reduce((sum, b) => sum + b.amount, 0);
+        const escrowHeld = Number(recon.escrow_online_revenue || 0);
 
         // Net Earnings & Authoritative Available Balance (Zero-Trust SSOT)
-        const netOnlineEarnings = Math.max(0, completedOnlineRevenue - gatewayFees - platformCommission);
-        const netBalance = Math.max(0, Math.round((netOnlineEarnings - totalPaidOut - pendingPayouts - cashDebt) * 100) / 100);
+        const netOnlineEarnings = completedOnlineRevenue;
+        const netBalance = Number(recon.available_balance || 0);
 
         // Payout Method & Destination
         let payoutMethod = null;
@@ -1562,67 +1514,21 @@ class AdminService {
     return data || [];
   }
 
-  async recordSmartOwnerSettlement({
-    ownerId,
-    amount,
-    method = 'vodafone_cash',
-    destination,
-    referenceNumber,
-    notes = '',
-  }) {
+  async recordSmartOwnerSettlement({ ownerId, amount, method = 'vodafone_cash', referenceNumber }) {
     try {
       const settleAmount = Number(amount);
-      if (isNaN(settleAmount) || settleAmount <= 0) {
+      if (!Number.isFinite(settleAmount) || settleAmount <= 0) {
         return { success: false, error: 'المبلغ المحدد غير صالح للتسوية المالية' };
       }
-
-      const ref = referenceNumber || null;
-
-      // 1. 🔒 التنفيذ الذري الصارم عبر RPC - إيقاف أي إجراء واعتبار المعاملة فاشلة فوراً إذا لم تنجح في الداتابيز
-      const { data: rpcData, error: rpcError } = await this.client.rpc('admin_record_payout_settlement_atomic', {
+      const { data, error } = await this.client.rpc('admin_record_payout_settlement_atomic', {
         p_owner_id: ownerId,
         p_amount: settleAmount,
         p_payment_method: method,
-        p_reference: ref,
+        p_reference: referenceNumber || null,
       });
-
-      if (rpcError) {
-        console.error('[AdminService] Settlement RPC failure:', rpcError);
-        throw new Error(`فشلت تسوية أرباح المالك في قاعدة البيانات: ${rpcError.message}`);
-      }
-
-      if (rpcData && rpcData.success === false) {
-        throw new Error(`فشلت تسوية أرباح المالك: ${rpcData.error || 'الرصيد المستحق في دفتر الأستاذ غير كافٍ'}`);
-      }
-
-      const serverReference = rpcData?.reference_number || ref;
-
-      // 2. توثيق سجل التحويل فقط بعد نجاح المعاملة المحاسبية الفعلية في قاعدة البيانات
-      const { error: settlementInsertError } = await this.client.from('payout_settlements').insert({
-        owner_id: ownerId,
-        amount: settleAmount,
-        method,
-        destination: destination || 'المحفظة المسجلة',
-        status: 'paid',
-        admin_notes: notes ? `${notes} (Ref: ${serverReference})` : `Ref: ${serverReference}`,
-      });
-      if (settlementInsertError) throw settlementInsertError;
-
-      // 3. إشعار المالك بالتحويل الناجح
-      try {
-        await this.client.from('notifications').insert({
-          user_id: ownerId,
-          title: 'تم تحويل مستحقاتك المالية بنجاح',
-          message: `تم إرسال مبلغ ${settleAmount.toLocaleString()} ج.م إلى حسابك عبر ${method} برقم مرجع: ${serverReference}`,
-          type: 'financial',
-          is_read: false,
-          created_at: new Date().toISOString(),
-        });
-      } catch (notifErr) {
-        console.warn('Payout notification dispatch notice:', notifErr);
-      }
-
-      return { success: true, referenceNumber: serverReference };
+      if (error) throw new Error('فشلت تسوية أرباح المالك في قاعدة البيانات: ' + error.message);
+      if (!data?.success) throw new Error('فشلت تسوية أرباح المالك: ' + (data?.error || 'تعذر تنفيذ التسوية'));
+      return { success: true, referenceNumber: data.reference_number || null, settlementId: data.settlement_id || null };
     } catch (e) {
       console.error('Error in recordSmartOwnerSettlement:', e);
       const err = classifyError(e);
@@ -1640,43 +1546,16 @@ class AdminService {
     return data || [];
   }
 
-  async recordPayoutSettlement({ settlementId, ownerId, amount, transactionId, method = 'vodafone_cash' }) {
+  async recordPayoutSettlement({ ownerId, amount, transactionId, method = 'vodafone_cash' }) {
     try {
-      const refNumber = transactionId || null;
-
-      // 🔒 Strict Security: Atomic RPC only, no direct transaction insertion fallback
-      const { data, error: rpcErr } = await this.client.rpc('admin_record_payout_settlement_atomic', {
+      const { data, error } = await this.client.rpc('admin_record_payout_settlement_atomic', {
         p_owner_id: ownerId,
         p_amount: Number(amount),
         p_payment_method: method,
-        p_reference: refNumber,
+        p_reference: transactionId || null,
       });
-
-      if (rpcErr) {
-        console.error('[AdminService] admin_record_payout_settlement_atomic failed:', rpcErr);
-        throw new Error(`فشلت تسوية أرباح المالك: ${rpcErr.message}`);
-      }
-
-      if (data && data.success === false) {
-        throw new Error(`فشلت تسوية أرباح المالك: ${data.error || 'خطأ غير معروف'}`);
-      }
-
-      const serverReference = data?.reference_number || refNumber;
-
-      // Update payout_settlements record
-      if (settlementId) {
-        const { error: updateErr } = await this.client
-          .from('payout_settlements')
-          .update({
-            status: 'paid',
-            admin_notes: `Ref: ${serverReference}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', settlementId);
-
-        if (updateErr) throw updateErr;
-      }
-
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشلت تسوية أرباح المالك');
       return { success: true, data };
     } catch (e) {
       console.error('Error in recordPayoutSettlement:', e);
@@ -1714,15 +1593,9 @@ class AdminService {
 
   async setMaintenanceMode(enabled) {
     try {
-      const { error } = await this.client
-        .from('app_config')
-        .upsert({
-          id: 1,
-          is_maintenance: enabled,
-          updated_at: new Date().toISOString(),
-        });
-
+      const { data, error } = await this.client.rpc('admin_set_maintenance_mode_atomic', { p_enabled: Boolean(enabled) });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث وضع الصيانة');
       return { success: true };
     } catch (e) {
       console.error('Error in setMaintenanceMode:', e);
@@ -1767,7 +1640,8 @@ class AdminService {
       const chunkSize = 100;
       for (let i = 0; i < payloads.length; i += chunkSize) {
         const chunk = payloads.slice(i, i + chunkSize);
-        await this.client.from('notifications').insert(chunk);
+        const { error: insertError } = await this.client.from('notifications').insert(chunk);
+        if (insertError) throw insertError;
       }
 
       return { success: true, count: payloads.length };
