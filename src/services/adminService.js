@@ -549,17 +549,16 @@ class AdminService {
 
   async updateChampionshipStatus(id, status) {
     try {
-      const { error } = await this.client
-        .from('championships')
-        .update({
-          status,
-          is_approved: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
+      const { data, error } = await this.client.rpc('admin_update_championship_status_atomic', {
+        p_championship_id: id,
+        p_status: status,
+      });
 
       if (error) throw error;
-      return { success: true };
+      if (data && data.success === false) {
+        return { success: false, error: data.error || 'Failed to update championship status' };
+      }
+      return { success: true, data };
     } catch (e) {
       console.error('Error in updateChampionshipStatus:', e);
       const err = classifyError(e);
