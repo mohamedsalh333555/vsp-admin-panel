@@ -148,7 +148,7 @@ export const AuthProvider = ({ children }) => {
       const dbClient = supabaseAdmin || supabase;
       const fileExt = file.name.split('.').pop();
       const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const filePath = `${user.id}/avatars/${fileName}`;
 
       const { error: uploadError } = await dbClient.storage
         .from('profile-pictures')
