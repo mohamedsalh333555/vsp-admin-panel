@@ -86,11 +86,25 @@ export const PayoutSettlementsPage = () => {
   const openSettlementModal = (owner) => {
     setSelectedOwner(owner);
     const dest = owner.payoutDestination || owner.phone || '';
-    const meth = owner.payoutMethod || (owner.p2p_instapay ? 'instapay' : 'vodafone_cash');
+    const registeredMethods = [
+      owner.p2p_vodafone?.trim() ? 'vodafone_cash' : null,
+      owner.p2p_instapay?.trim() ? 'instapay' : null,
+      owner.p2p_bank?.trim() ? 'bank_transfer' : null,
+    ].filter(Boolean);
+    const meth = registeredMethods.includes(owner.payoutMethod)
+      ? owner.payoutMethod
+      : registeredMethods[0] || '';
+    const selectedDestination = meth === 'vodafone_cash'
+      ? owner.p2p_vodafone?.trim()
+      : meth === 'instapay'
+        ? owner.p2p_instapay?.trim()
+        : meth === 'bank_transfer'
+          ? owner.p2p_bank?.trim()
+          : '';
     setSettlementForm({
       amount: owner.netBalance > 0 ? owner.netBalance : '',
       method: meth,
-      destination: dest,
+      destination: selectedDestination || dest,
       referenceNumber: '',
       notes: '',
     });
