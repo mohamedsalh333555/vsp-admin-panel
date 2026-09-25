@@ -44,8 +44,6 @@ export const AuthProvider = ({ children }) => {
   const fetchUserProfile = async (userId, email) => {
     try {
       const normalizedEmail = (email || '').toLowerCase().trim();
-      const isCoFounderEmail = COFOUNDER_EMAILS.includes(normalizedEmail);
-
       const dbClient = supabaseAdmin || supabase;
       const { data, error } = await dbClient
         .from('users')
@@ -58,7 +56,7 @@ export const AuthProvider = ({ children }) => {
       const defaultPosition = isHana ? 'CEO' : 'COO';
 
       if (data) {
-        const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
+        const isCoFounder = data.role === 'cofounder' || data.role === 'co_founder';
         const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(data.role?.toLowerCase());
         // أمان تام: التحقق من أن الدور إداري فعلياً وأن الحساب غير محظور
         const isApprovedAdmin = !data.is_blocked && (isCoFounder || (isAdminRole && data.verification_status === 'approved'));
@@ -71,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
         setProfile({
           ...data,
-          name: data.name?.trim() ? data.name : (isCoFounderEmail ? defaultName : (data.email || 'Admin')),
+          name: data.name?.trim() ? data.name : (data.email || 'Admin'),
           position: livePosition,
           isCoFounder,
           isApprovedAdmin,
@@ -82,9 +80,9 @@ export const AuthProvider = ({ children }) => {
           email: normalizedEmail,
           name: defaultName,
           position: isCoFounderEmail ? defaultPosition : 'Admin',
-          role: isCoFounderEmail ? 'co_founder' : 'guest',
-          isCoFounder: isCoFounderEmail,
-          isApprovedAdmin: isCoFounderEmail,
+          role: 'guest',
+          isCoFounder: false,
+          isApprovedAdmin: false,
         });
       }
     } catch (err) {
@@ -111,7 +109,6 @@ export const AuthProvider = ({ children }) => {
 
     // فحص الصلاحية الإدارية فوراً لمنع تعليق الحسابات العادية
     try {
-      const isCoFounderEmail = COFOUNDER_EMAILS.includes(normalizedEmail);
       const { data: userData } = await supabase
         .from('users')
         .select('id, email, role, is_blocked, verification_status')
@@ -125,7 +122,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('تم حظر أو إيقاف هذا الحساب الإداري. يرجى مراجعة إدارة المنظومة.');
       }
 
-      const isCoFounder = isCoFounderEmail || userData?.role === 'cofounder' || userData?.role === 'co_founder';
+      const isCoFounder = userData?.role === 'cofounder' || userData?.role === 'co_founder';
       const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(userData?.role?.toLowerCase());
       const isApprovedAdmin = isCoFounder || (isAdminRole && userData?.verification_status === 'approved');
 
