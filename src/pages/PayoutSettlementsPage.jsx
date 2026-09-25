@@ -650,7 +650,6 @@ export const PayoutSettlementsPage = () => {
                   <option value="vodafone_cash">{t('vodafone_cash')}</option>
                   <option value="instapay">{t('instapay')}</option>
                   <option value="bank_transfer">{t('bank_transfer')}</option>
-                  <option value="cash_direct">{t('cash_direct')}</option>
                 </select>
               </div>
 
