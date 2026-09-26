@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Cup,
   Profile2User,
@@ -1595,3 +1595,4 @@ export const League1v1Page = () => {
  </div>
  );
 };
+

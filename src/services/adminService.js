@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+﻿import { supabase, supabaseAdmin } from '../lib/supabase';
 
 export function classifyError(e) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -1452,3 +1452,4 @@ class AdminService {
 }
 
 export const adminService = new AdminService();
+
