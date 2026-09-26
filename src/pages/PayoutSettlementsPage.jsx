@@ -86,11 +86,25 @@ export const PayoutSettlementsPage = () => {
   const openSettlementModal = (owner) => {
     setSelectedOwner(owner);
     const dest = owner.payoutDestination || owner.phone || '';
-    const meth = owner.payoutMethod || (owner.p2p_instapay ? 'instapay' : 'vodafone_cash');
+    const registeredMethods = [
+      owner.p2p_vodafone?.trim() ? 'vodafone_cash' : null,
+      owner.p2p_instapay?.trim() ? 'instapay' : null,
+      owner.p2p_bank?.trim() ? 'bank_transfer' : null,
+    ].filter(Boolean);
+    const meth = registeredMethods.includes(owner.payoutMethod)
+      ? owner.payoutMethod
+      : registeredMethods[0] || '';
+    const selectedDestination = meth === 'vodafone_cash'
+      ? owner.p2p_vodafone?.trim()
+      : meth === 'instapay'
+        ? owner.p2p_instapay?.trim()
+        : meth === 'bank_transfer'
+          ? owner.p2p_bank?.trim()
+          : '';
     setSettlementForm({
       amount: owner.netBalance > 0 ? owner.netBalance : '',
       method: meth,
-      destination: dest,
+      destination: selectedDestination || dest,
       referenceNumber: '',
       notes: '',
     });
@@ -647,10 +661,9 @@ export const PayoutSettlementsPage = () => {
                   onChange={(e) => setSettlementForm({ ...settlementForm, method: e.target.value })}
                   className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500"
                 >
-                  <option value="vodafone_cash">{t('vodafone_cash')}</option>
-                  <option value="instapay">{t('instapay')}</option>
-                  <option value="bank_transfer">{t('bank_transfer')}</option>
-                  <option value="cash_direct">{t('cash_direct')}</option>
+                  {selectedOwner.p2p_vodafone && <option value="vodafone_cash">{t('vodafone_cash')}</option>}
+                  {selectedOwner.p2p_instapay && <option value="instapay">{t('instapay')}</option>}
+                  {selectedOwner.p2p_bank && <option value="bank_transfer">{t('bank_transfer')}</option>}
                 </select>
               </div>
 
@@ -662,9 +675,9 @@ export const PayoutSettlementsPage = () => {
                   type="text"
                   required
                   value={settlementForm.destination}
-                  onChange={(e) => setSettlementForm({ ...settlementForm, destination: e.target.value })}
-                  placeholder="01XXXXXXXXX / username@instapay"
-                  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full bg-vsp-card/60 border border-vsp-border rounded-xl px-3.5 py-2.5 text-xs text-zinc-300 font-mono cursor-not-allowed"
                 />
               </div>
             </div>

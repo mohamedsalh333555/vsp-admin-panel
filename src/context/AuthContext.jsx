@@ -3,14 +3,6 @@ import { supabase, supabaseAdmin } from '../lib/supabase';
 
 const AuthContext = createContext();
 
-const COFOUNDER_EMAILS = [
-  'mohamedsalh333555@gmail.com',
-  'admin@vsp.com',
-  'coo@vsp.com',
-  'hana.ramadan@vsp.com',
-  'ceo@vsp.com',
-];
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -21,7 +13,7 @@ export const AuthProvider = ({ children }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        fetchUserProfile(session.user.id, session.user.email);
+        fetchUserProfile(session.user.id);
       } else {
         setLoading(false);
       }
@@ -30,7 +22,7 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user);
-        fetchUserProfile(session.user.id, session.user.email);
+        fetchUserProfile(session.user.id);
       } else {
         setUser(null);
         setProfile(null);
@@ -41,11 +33,8 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (userId, email) => {
+  const fetchUserProfile = async (userId) => {
     try {
-      const normalizedEmail = (email || '').toLowerCase().trim();
-      const isCoFounderEmail = COFOUNDER_EMAILS.includes(normalizedEmail);
-
       const dbClient = supabaseAdmin || supabase;
       const { data, error } = await dbClient
         .from('users')
@@ -53,12 +42,11 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      const isHana = normalizedEmail.includes('hana') || normalizedEmail.includes('ceo');
-      const defaultName = isHana ? 'Hana Ramadan' : 'Mohamed Saleh';
-      const defaultPosition = isHana ? 'CEO' : 'COO';
+      const defaultName = 'Admin';
+      const defaultPosition = 'Admin';
 
       if (data) {
-        const isCoFounder = isCoFounderEmail || data.role === 'cofounder' || data.role === 'co_founder';
+        const isCoFounder = data.role === 'cofounder' || data.role === 'co_founder';
         const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(data.role?.toLowerCase());
         // أمان تام: التحقق من أن الدور إداري فعلياً وأن الحساب غير محظور
         const isApprovedAdmin = !data.is_blocked && (isCoFounder || (isAdminRole && data.verification_status === 'approved'));
@@ -71,7 +59,7 @@ export const AuthProvider = ({ children }) => {
 
         setProfile({
           ...data,
-          name: data.name?.trim() ? data.name : (isCoFounderEmail ? defaultName : (data.email || 'Admin')),
+          name: data.name?.trim() ? data.name : (data.email || 'Admin'),
           position: livePosition,
           isCoFounder,
           isApprovedAdmin,
@@ -79,12 +67,12 @@ export const AuthProvider = ({ children }) => {
       } else {
         setProfile({
           id: userId,
-          email: normalizedEmail,
+          email: '',
           name: defaultName,
-          position: isCoFounderEmail ? defaultPosition : 'Admin',
-          role: isCoFounderEmail ? 'co_founder' : 'guest',
-          isCoFounder: isCoFounderEmail,
-          isApprovedAdmin: isCoFounderEmail,
+          position: defaultPosition,
+          role: 'guest',
+          isCoFounder: false,
+          isApprovedAdmin: false,
         });
       }
     } catch (err) {
@@ -111,7 +99,6 @@ export const AuthProvider = ({ children }) => {
 
     // فحص الصلاحية الإدارية فوراً لمنع تعليق الحسابات العادية
     try {
-      const isCoFounderEmail = COFOUNDER_EMAILS.includes(normalizedEmail);
       const { data: userData } = await supabase
         .from('users')
         .select('id, email, role, is_blocked, verification_status')
@@ -125,7 +112,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('تم حظر أو إيقاف هذا الحساب الإداري. يرجى مراجعة إدارة المنظومة.');
       }
 
-      const isCoFounder = isCoFounderEmail || userData?.role === 'cofounder' || userData?.role === 'co_founder';
+      const isCoFounder = userData?.role === 'cofounder' || userData?.role === 'co_founder';
       const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(userData?.role?.toLowerCase());
       const isApprovedAdmin = isCoFounder || (isAdminRole && userData?.verification_status === 'approved');
 
@@ -151,7 +138,7 @@ export const AuthProvider = ({ children }) => {
       const dbClient = supabaseAdmin || supabase;
       const fileExt = file.name.split('.').pop();
       const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const filePath = `${user.id}/avatars/${fileName}`;
 
       const { error: uploadError } = await dbClient.storage
         .from('profile-pictures')
