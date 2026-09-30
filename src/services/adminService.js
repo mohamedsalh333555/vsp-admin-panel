@@ -1058,6 +1058,38 @@ class AdminService {
   }
 
 
+  async update1v1TournamentStatus(tournamentId, status) {
+    try {
+      const { data, error } = await this.client
+        .from('vsp_1v1_tournaments')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', tournamentId)
+        .select()
+        .single();
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in update1v1TournamentStatus:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
+  async cancel1v1TournamentWithRefunds(tournamentId, reason = '') {
+    try {
+      const { data, error } = await this.client.rpc('cancel_1v1_tournament_with_refund_requests', {
+        p_tournament_id: tournamentId,
+        p_reason: reason || 'إلغاء البطولة بقرار الإدارة',
+      });
+      if (error) throw error;
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in cancel1v1TournamentWithRefunds:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
   async getActiveOrLatest1v1Tournament(governorate = null) {
     try {
       // 1. Find currently active tournament (registration_open, in_progress, completed, published)

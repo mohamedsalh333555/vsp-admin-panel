@@ -384,6 +384,29 @@ export const League1v1Page = () => {
  }
  };
 
+  const handleCancelTournament = async () => {
+    if (!activeTournament?.id) return;
+    const confirmCancel = window.confirm(
+      'هل أنت متأكد من إلغاء هذه البطولة؟\nسيتم رفع طلبات استرداد رسمية عبر باي موب لجميع اللاعبين الذين سددوا الرسوم لإعادتها إلى وسائل دفعهم الأصلية.'
+    );
+    if (!confirmCancel) return;
+
+    try {
+      setProcessing(true);
+      const res = await adminService.cancel1v1TournamentWithRefunds(activeTournament.id);
+      if (!res.success) throw new Error(res.error || 'فشل إلغاء البطولة');
+      setAlert({
+        type: 'success',
+        message: 'تم إلغاء البطولة وتسجيل طلبات استرداد الرسوم عبر باي موب بنجاح! 💳',
+      });
+      loadData();
+    } catch (e) {
+      setAlert({ type: 'error', message: e.message });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   // -------------------------------------------------------------------------
   // 3. SAVE DRAFT (حفظ كمسودة دون نشر - حساب النقاط في الباك إند)
   // -------------------------------------------------------------------------
