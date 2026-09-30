@@ -534,9 +534,12 @@ class AdminService {
   // =========================================================================
   async fetchChampionships() {
     try {
+      // Regular Tournament Control must not ingest Team League records.
+      // Team League uses template_type='team_league' and has a separate lifecycle.
       const { data, error } = await this.client
         .from('championships')
         .select('*')
+        .neq('template_type', 'team_league')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -585,17 +588,13 @@ class AdminService {
 
   async prepareTournamentBracket(championshipId) {
     try {
-      // First try the new centralized atomic bracket generator
+      // Single canonical bracket-generation RPC. No alternate mutation path.
       const { data, error } = await this.client.rpc('generate_tournament_bracket_atomic', {
         p_championship_id: championshipId,
       });
-      if (error) {
-        // Fallback to prepare_tournament_bracket_atomic
-        const fallback = await this.client.rpc('prepare_tournament_bracket_atomic', {
-          p_championship_id: championshipId,
-        });
-        if (fallback.error) throw fallback.error;
-        return { success: true, data: fallback.data };
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || 'فشل إطلاق القرعة وتوليد شجرة المباريات');
       }
       return { success: true, data };
     } catch (e) {
@@ -1484,4 +1483,3 @@ class AdminService {
 }
 
 export const adminService = new AdminService();
-
