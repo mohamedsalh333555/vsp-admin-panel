@@ -104,11 +104,14 @@ export const League1v1Page = () => {
  const [isDirty, setIsDirty] = useState(false);
  const [showPublishConfirmModal, setShowPublishConfirmModal] = useState(false);
  const [publishConfirmedCheckbox, setPublishConfirmedCheckbox] = useState(false);
+  const [prizeDeliveryInput, setPrizeDeliveryInput] = useState('');
 
  // History & Registrations State
  const [historyList, setHistoryList] = useState([]);
  const [registrations, setRegistrations] = useState([]);
  const [viewHistoryModal, setViewHistoryModal] = useState(false);
+  const [failedRefunds, setFailedRefunds] = useState([]);
+  const [showFailedRefundsModal, setShowFailedRefundsModal] = useState(false);
  const [selectedHistoryTournament, setSelectedHistoryTournament] = useState(null);
  const [historyPlayers, setHistoryPlayers] = useState([]);
 
@@ -150,6 +153,18 @@ export const League1v1Page = () => {
    const regRes = await adminService.fetch1v1PendingRegistrations();
    if (regRes.success) {
     setRegistrations(regRes.data || []);
+   }
+
+   // 5. Fetch failed refunds
+   try {
+     const { data: refundsData } = await supabase
+       .from('vsp_1v1_tournament_orders')
+       .select('id, user_id, amount, order_reference, paymob_transaction_id, created_at, updated_at')
+       .eq('payment_status', 'refund_failed_manual_review')
+       .order('created_at', { ascending: false });
+     setFailedRefunds(refundsData || []);
+   } catch (refErr) {
+     console.warn('Notice: Error loading failed refunds:', refErr);
    }
   } catch (e) {
    console.error('Error loading 1v1 data:', e);
@@ -492,6 +507,20 @@ export const League1v1Page = () => {
         throw new Error(pubRes.error || 'فشل نشر البطولة');
       }
 
+      if (prizeDeliveryInput && prizeDeliveryInput.trim()) {
+        try {
+          await supabase
+            .from('vsp_1v1_tournaments')
+            .update({
+              prize_delivery_details: prizeDeliveryInput.trim(),
+              prize_delivery_scheduled_at: new Date().toISOString(),
+            })
+            .eq('id', activeTournament.id);
+        } catch (deliveryErr) {
+          console.warn('Notice saving prize delivery details:', deliveryErr);
+        }
+      }
+
       setIsDirty(false);
       setShowPublishConfirmModal(false);
       setAlert({
@@ -590,7 +619,34 @@ export const League1v1Page = () => {
  {/* ==================================================================== */}
  {/* ALERT BANNER */}
  {/* ==================================================================== */}
- {alert && (
+       {/* ==================================================================== */}
+      {/* FAILED REFUNDS CRITICAL ALERT BANNER */}
+      {/* ==================================================================== */}
+      {failedRefunds.length > 0 && (
+        <div className="p-4 bg-red-950/40 border border-red-500/50 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-red-200 shadow-2xl">
+          <div className="flex items-center gap-3">
+            <span className="p-2.5 bg-red-900/60 border border-red-500/40 rounded-xl text-red-400">
+              <Warning2 className="w-6 h-6" variant="Outline" />
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-red-100">
+                ⚠️ تنبيه مالي عاجل: يوجد {failedRefunds.length} استرداد رسوم فاشل يحتاج مراجعة وتدخل فوري
+              </h3>
+              <p className="text-xs text-red-300/80 mt-0.5">
+                فشل استرداد رسوم بعض اللاعبين عبر باي موب بسبب خطأ تقني. يرجى مراجعة التفاصيل لتنفيذ الاسترداد يدوياً وحماية حقوق اللاعبين.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowFailedRefundsModal(true)}
+            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all active:scale-95 whitespace-nowrap"
+          >
+            عرض التفاصيل ({failedRefunds.length})
+          </button>
+        </div>
+      )}
+
+      {alert && (
  <div
  className={`p-4 rounded-xl flex items-center justify-between gap-3 border transition-all ${
  alert.type === 'success'
@@ -1615,7 +1671,107 @@ export const League1v1Page = () => {
  </button>
  </div>
  )}
- </div>
+      {showFailedRefundsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-vsp-surface border border-red-500/40 rounded-2xl p-6 max-w-2xl w-full text-right shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-vsp-border pb-3">
+              <div className="flex items-center gap-2 text-red-400">
+                <Danger className="w-5 h-5" />
+                <h3 className="font-bold text-base text-white">الاستردادات المالية الفاشلة ({failedRefunds.length})</h3>
+              </div>
+              <button
+                onClick={() => setShowFailedRefundsModal(false)}
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-vsp-card"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-vsp-textSecondary">
+              هذه الطلبات دفع لاعبوها رسوم البطولة، ولكن اكتملت المقاعد في نفس اللحظة وفشلت بوابة باي موب في معالجة طلب الاسترداد التلقائي. يجب تحويل المبلغ لهم يدوياً.
+            </p>
+
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+              {failedRefunds.map((order) => (
+                <div key={order.id} className="p-3 bg-vsp-card border border-vsp-border rounded-xl flex items-center justify-between text-xs">
+                  <div>
+                    <div className="font-mono text-zinc-200 font-bold">{order.order_reference}</div>
+                    <div className="text-[11px] text-vsp-textSecondary mt-0.5">
+                      معاملة باي موب: {order.paymob_transaction_id || 'غير متوفر'} • {new Date(order.created_at).toLocaleDateString('ar-EG')}
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <span className="text-red-400 font-extrabold text-sm">{order.amount} ج.م</span>
+                    <div className="text-[10px] text-amber-400 font-bold">يحتاج مراجعة</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-vsp-border flex justify-end">
+              <button
+                onClick={() => setShowFailedRefundsModal(false)}
+                className="px-4 py-2 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white text-xs font-bold rounded-xl"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* FAILED REFUNDS DETAILS MODAL */}
+      {/* ==================================================================== */}
+      {showFailedRefundsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-vsp-surface border border-red-500/40 rounded-2xl p-6 max-w-2xl w-full text-right shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-vsp-border pb-3">
+              <div className="flex items-center gap-2 text-red-400">
+                <Warning2 className="w-5 h-5" />
+                <h3 className="font-bold text-base text-white">الاستردادات المالية الفاشلة ({failedRefunds.length})</h3>
+              </div>
+              <button
+                onClick={() => setShowFailedRefundsModal(false)}
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-vsp-card"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-vsp-textSecondary">
+              هذه الطلبات دفع لاعبوها رسوم البطولة، ولكن اكتملت المقاعد في نفس اللحظة وفشلت بوابة باي موب في معالجة طلب الاسترداد التلقائي. يجب تحويل المبلغ لهم يدوياً.
+            </p>
+
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+              {failedRefunds.map((order) => (
+                <div key={order.id} className="p-3 bg-vsp-card border border-vsp-border rounded-xl flex items-center justify-between text-xs">
+                  <div>
+                    <div className="font-mono text-zinc-200 font-bold">{order.order_reference}</div>
+                    <div className="text-[11px] text-vsp-textSecondary mt-0.5">
+                      معاملة باي موب: {order.paymob_transaction_id || 'غير متوفر'} • {new Date(order.created_at).toLocaleDateString('ar-EG')}
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <span className="text-red-400 font-extrabold text-sm">{order.amount} ج.م</span>
+                    <div className="text-[10px] text-amber-400 font-bold">يحتاج مراجعة</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-vsp-border flex justify-end">
+              <button
+                onClick={() => setShowFailedRefundsModal(false)}
+                className="px-4 py-2 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white text-xs font-bold rounded-xl"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
  );
 };
 

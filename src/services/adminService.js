@@ -539,7 +539,7 @@ class AdminService {
       const { data, error } = await this.client
         .from('championships')
         .select('*')
-        .neq('template_type', 'team_league')
+        .or('template_type.neq.team_league,template_type.is.null')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -1081,6 +1081,40 @@ class AdminService {
       return { success: true, data };
     } catch (e) {
       console.error('Error saving 1v1 tournament players:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
+  async saveAndPublish1v1Tournament({ tournamentId, playersList, fallbackStatus }) {
+    try {
+      if (!tournamentId) {
+        return { success: false, error: 'معرف البطولة مطلوب للنشر.' };
+      }
+      const formattedPlayers = Array.isArray(playersList)
+        ? playersList.map((p) => ({
+            id: p.id || null,
+            player_name: String(p.player_name || p.name || '').trim(),
+            user_id: p.user_id || null,
+            avatar_url: p.avatar_url || null,
+            tackles: Math.max(0, Number(p.tackles) || 0),
+            goals: Math.max(0, Number(p.goals) || 0),
+            skills: Math.max(0, Number(p.skills ?? p.skill_points) || 0),
+            round_reached: p.round_reached ? String(p.round_reached).trim() : null,
+          }))
+        : [];
+
+      const { data, error } = await this.client.rpc('save_and_publish_1v1_tournament_atomic', {
+        p_tournament_id: tournamentId,
+        p_players: formattedPlayers,
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل حفظ ونشر بطولة 1v1');
+
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error in saveAndPublish1v1Tournament:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
