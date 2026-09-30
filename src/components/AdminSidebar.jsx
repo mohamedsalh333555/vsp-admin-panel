@@ -79,6 +79,11 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
       icon: Flash,
     },
     {
+      id: 'team_leagues',
+      label: 'دوري الفرق',
+      icon: Cup,
+    },
+    {
       id: 'tournaments',
       label: t('tournaments'),
       icon: Cup,
