@@ -550,6 +550,36 @@ class AdminService {
     }
   }
 
+  async fetchTeamLeagues() {
+    try {
+      const { data, error } = await this.client
+        .from('championships')
+        .select('id,name,type,template_type,status,max_teams,entry_fee,owner_id,governorate,joined_teams,paid_teams,match_interval_days,champion_team_id,champion_team_name,created_at,updated_at')
+        .eq('template_type', 'team_league')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('Error in fetchTeamLeagues:', e);
+      throw e;
+    }
+  }
+
+  async fetchTeamLeagueStandings(championshipId) {
+    try {
+      const { data, error } = await this.client.rpc('get_team_league_standings', {
+        p_championship_id: championshipId,
+      });
+
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('Error in fetchTeamLeagueStandings:', e);
+      throw e;
+    }
+  }
+
   async updateChampionshipStatus(id, status) {
     try {
       const { data, error } = await this.client.rpc('admin_update_championship_status_atomic', {
@@ -1298,188 +1328,3 @@ class AdminService {
         .filter((o) => o.netBalance > 0)
         .reduce((sum, o) => sum + o.netBalance, 0);
       const totalEscrowHeld = ownerMatrix.reduce((sum, o) => sum + (o.escrowHeld || 0), 0);
-      const totalSettledPayouts = ownerMatrix.reduce((sum, o) => sum + o.totalPaidOut, 0);
-
-      return {
-        ownerMatrix,
-        transactions,
-        settlements,
-        kpis: {
-          totalGrossSystemVolume,
-          totalOnlineCollected,
-          totalPlatformRevenue,
-          totalPendingOwnerDues,
-          totalEscrowHeld,
-          totalSettledPayouts,
-        },
-      };
-    } catch (e) {
-      console.error('[AdminService] Error in fetchFinancialOverview from SSOT view:', e);
-      const err = classifyError(e);
-      return {
-        ownerMatrix: [],
-        transactions: [],
-        settlements: [],
-        kpis: {
-          totalGrossSystemVolume: 0,
-          totalOnlineCollected: 0,
-          totalPlatformRevenue: 0,
-          totalPendingOwnerDues: 0,
-          totalEscrowHeld: 0,
-          totalSettledPayouts: 0,
-        },
-        error: err.message,
-        errorType: err.type,
-      };
-    }
-  }
-
-  async fetchFinancialTransactions() {
-    const { data, error } = await this.client
-      .from('transactions')
-      .select('*, users(name, phone, role)')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async recordSmartOwnerSettlement({ ownerId, amount, method = 'vodafone_cash', referenceNumber }) {
-    try {
-      const settleAmount = Number(amount);
-      if (!Number.isFinite(settleAmount) || settleAmount <= 0) {
-        return { success: false, error: 'المبلغ المحدد غير صالح للتسوية المالية' };
-      }
-      const { data, error } = await this.client.rpc('admin_record_payout_settlement_atomic', {
-        p_owner_id: ownerId,
-        p_amount: settleAmount,
-        p_payment_method: method,
-        p_reference: referenceNumber || null,
-      });
-      if (error) throw new Error('فشلت تسوية أرباح المالك في قاعدة البيانات: ' + error.message);
-      if (!data?.success) throw new Error('فشلت تسوية أرباح المالك: ' + (data?.error || 'تعذر تنفيذ التسوية'));
-      return { success: true, referenceNumber: data.reference_number || null, settlementId: data.settlement_id || null };
-    } catch (e) {
-      console.error('Error in recordSmartOwnerSettlement:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-  async fetchPayoutSettlements() {
-    const { data, error } = await this.client
-      .from('payout_settlements')
-      .select('*, users(name, phone, email, governorate)')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async recordPayoutSettlement({ ownerId, amount, transactionId, method = 'vodafone_cash' }) {
-    try {
-      const { data, error } = await this.client.rpc('admin_record_payout_settlement_atomic', {
-        p_owner_id: ownerId,
-        p_amount: Number(amount),
-        p_payment_method: method,
-        p_reference: transactionId || null,
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'فشلت تسوية أرباح المالك');
-      return { success: true, data };
-    } catch (e) {
-      console.error('Error in recordPayoutSettlement:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-  // =========================================================================
-  // MODULE H: CRM BROADCAST CENTER & SYSTEM CONFIG
-  // =========================================================================
-  async fetchSystemConfig() {
-    try {
-      const { data, error } = await this.client
-        .from('app_config')
-        .select('*')
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) {
-        return { success: false, error: 'بيانات إعدادات النظام غير متاحة في Supabase' };
-      }
-
-      return {
-        success: true,
-        maintenance_mode: Boolean(data.is_maintenance),
-        vsp_1v1_is_open: Boolean(data.vsp_1v1_is_open),
-        min_version: data.min_version ?? null,
-      };
-    } catch (e) {
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-  async setMaintenanceMode(enabled) {
-    try {
-      const { data, error } = await this.client.rpc('admin_set_maintenance_mode_atomic', { p_enabled: Boolean(enabled) });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'فشل تحديث وضع الصيانة');
-      return { success: true };
-    } catch (e) {
-      console.error('Error in setMaintenanceMode:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-  async sendTargetedBroadcastNotification({
-    title,
-    body,
-    targetAudience = 'all', // 'all' | 'players' | 'owners'
-    notificationType = 'announcement',
-  }) {
-    try {
-      let query = this.client.from('users').select('id, role');
-
-      if (targetAudience === 'players') {
-        query = query.or('role.eq.player,role.is.null');
-      } else if (targetAudience === 'owners') {
-        query = query.eq('role', 'owner');
-      }
-
-      const { data: users, error: usersErr } = await query;
-      if (usersErr) throw usersErr;
-
-      if (!users || users.length === 0) {
-        return { success: false, count: 0, error: 'لا يوجد مستخدمين مسجلين في الفئة المحددة' };
-      }
-
-      const payloads = users.map((u) => ({
-        user_id: u.id,
-        title,
-        body,
-        message: body,
-        type: notificationType,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      }));
-
-      // Insert in chunks of 100 to avoid payload size limit
-      const chunkSize = 100;
-      for (let i = 0; i < payloads.length; i += chunkSize) {
-        const chunk = payloads.slice(i, i + chunkSize);
-        const { error: insertError } = await this.client.from('notifications').insert(chunk);
-        if (insertError) throw insertError;
-      }
-
-      return { success: true, count: payloads.length };
-    } catch (e) {
-      console.error('Error sending broadcast notification:', e);
-      return { success: false, count: 0, error: e.message };
-    }
-  }
-}
-
-export const adminService = new AdminService();
