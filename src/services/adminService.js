@@ -1089,13 +1089,15 @@ class AdminService {
 
   async update1v1TournamentStatus(tournamentId, status) {
     try {
-      const { data, error } = await this.client
-        .from('vsp_1v1_tournaments')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', tournamentId)
-        .select()
-        .single();
+      const { data, error } = await this.client.rpc(
+        'admin_update_1v1_tournament_status_atomic',
+        {
+          p_tournament_id: tournamentId,
+          p_status: String(status || '').trim(),
+        },
+      );
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل تحديث حالة بطولة 1v1');
       return { success: true, data };
     } catch (e) {
       console.error('Error in update1v1TournamentStatus:', e);
@@ -1103,6 +1105,7 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
+
 
   async cancel1v1TournamentWithRefunds(tournamentId, reason = '') {
     try {
@@ -1513,4 +1516,3 @@ class AdminService {
 }
 
 export const adminService = new AdminService();
-
