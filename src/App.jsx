@@ -14,13 +14,14 @@ import { DisputesPage } from './pages/DisputesPage';
 import { PayoutSettlementsPage } from './pages/PayoutSettlementsPage';
 import { League1v1Page } from './pages/League1v1Page';
 import { TournamentControlPage } from './pages/TournamentControlPage';
+import { TeamLeagueControlPage } from './pages/TeamLeagueControlPage';
 import { BannersManagementPage } from './pages/BannersManagementPage';
 import { CRMSettingsPage } from './pages/CRMSettingsPage';
 import { Clock, Logout, RotateRight } from 'iconsax-react';
 
 const VALID_TABS = [
   'dashboard', 'owner_audits', 'owner_subscriptions', 'users',
-  'disputes', 'payout_settlements', 'league_1v1', 'tournaments',
+  'disputes', 'payout_settlements', 'league_1v1', 'team_leagues', 'tournaments',
   'banners', 'settings',
 ];
 
@@ -113,6 +114,8 @@ export default function App() {
         return <PayoutSettlementsPage />;
       case 'league_1v1':
         return <League1v1Page />;
+      case 'team_leagues':
+        return <TeamLeagueControlPage />;
       case 'tournaments':
         return <TournamentControlPage />;
       case 'banners':
@@ -140,6 +143,8 @@ export default function App() {
         return t('payout_settlements');
       case 'league_1v1':
         return t('league_1v1');
+      case 'team_leagues':
+        return 'دوري الفرق';
       case 'tournaments':
         return t('tournaments');
       case 'banners':
