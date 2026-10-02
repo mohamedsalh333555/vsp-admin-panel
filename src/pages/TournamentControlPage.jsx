@@ -592,9 +592,10 @@ export const TournamentControlPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {approvedTournaments.map((champ) => {
             const isProcessing = updatingId === champ.id;
-            const status = champ.status || 'draft';
-            const isOngoing = status === 'ongoing' || status === 'in_progress' || status === 'active';
+            const status = champ.status || 'open';
+            const isOngoing = status === 'ongoing';
             const isCompleted = status === 'completed';
+            const isCancelled = status === 'cancelled';
 
             return (
               <div
@@ -610,13 +611,11 @@ export const TournamentControlPage = () => {
                           ? 'accent'
                           : isCompleted
                           ? 'success'
-                          : status === 'open' || status === 'registration_open'
-                          ? 'blue'
-                          : 'default'
+                          : status === 'open' ? 'blue' : isCancelled ? 'danger' : 'default'
                       }
                       size="xs"
                     >
-                      {status === 'open' ? 'تسجيل مفتوح' : status === 'ongoing' ? 'جارية' : status === 'completed' ? 'مكتملة' : status}
+                      {status === 'open' ? 'تسجيل مفتوح' : status === 'ongoing' ? 'جارية' : status === 'completed' ? 'مكتملة' : status === 'cancelled' ? 'ملغاة' : status}
                     </Badge>
                   </div>
 
