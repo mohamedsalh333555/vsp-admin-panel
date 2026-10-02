@@ -53,18 +53,22 @@ class AdminService {
       const pendingOwnersCount = Array.isArray(pendingOwners) ? pendingOwners.length : 0;
       const bookingRows = Array.isArray(bookingsRes?.data) ? bookingsRes.data : [];
       const validBookings = bookingRows.filter((b) => b.status === 'confirmed' || b.status === 'completed' || b.status === 'paid');
-      const totalRevenue = Number(financialOverview?.kpis?.totalGrossSystemVolume || 0);
+      const hasFinancialData = financialOverview?.kpis !== null && !financialOverview?.isUnavailable;
+      const totalGrossVolume = hasFinancialData ? Number(financialOverview.kpis.totalGrossSystemVolume || 0) : null;
+      const totalPlatformRevenue = hasFinancialData ? Number(financialOverview.kpis.totalPlatformRevenue || 0) : null;
 
       return {
         totalUsers: usersRes?.count ?? 0,
         totalStadiums: stadiumsRes?.count ?? 0,
         totalBookings: validBookings.length || bookingRows.length,
-        totalRevenue,
+        totalGrossVolume,
+        totalPlatformRevenue,
+        financialUnavailable: !hasFinancialData,
         total1v1Players,
         pendingOwners: pendingOwnersCount,
         disputesCount: disputesRes?.count ?? 0,
-        pendingPayouts: Number(financialOverview?.kpis?.totalPendingOwnerDues || 0),
-        totalEscrowHeld: Number(financialOverview?.kpis?.totalEscrowHeld || 0),
+        pendingPayouts: hasFinancialData ? Number(financialOverview.kpis.totalPendingOwnerDues || 0) : null,
+        totalEscrowHeld: hasFinancialData ? Number(financialOverview.kpis.totalEscrowHeld || 0) : null,
       };
     } catch (e) {
       console.error('Error in fetchDashboardStats:', e);
@@ -98,12 +102,25 @@ class AdminService {
 
   async updateBookingDetails(bookingId, updates) {
     try {
+      // Whitelist only allowed administrative editable fields
+      const ALLOWED_FIELDS = [
+        'total_price', 'deposit_paid', 'start_time', 'end_time',
+        'player_team_name', 'opponent_team_name', 'current_players',
+        'is_private', 'rent_ball', 'player_phone', 'notes', 'home_score', 'away_score'
+      ];
+      const sanitizedUpdates = {};
+      Object.keys(updates || {}).forEach((key) => {
+        if (ALLOWED_FIELDS.includes(key)) {
+          sanitizedUpdates[key] = updates[key];
+        }
+      });
+
       const { data, error } = await this.client.rpc('admin_update_booking_safe_atomic', {
         p_booking_id: bookingId,
-        p_updates: updates || {},
+        p_updates: sanitizedUpdates,
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'فشل تحديث بيانات الحجز');
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل تحديث بيانات الحجز');
       return { success: true, data };
     } catch (e) {
       console.error('Error in updateBookingDetails:', e);
@@ -111,6 +128,7 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
+
   async cancelBookingWithReason(bookingId, reason) {
     try {
       const { data, error } = await this.client.rpc('admin_cancel_booking_atomic', {
@@ -126,24 +144,31 @@ class AdminService {
       return { success: false, error: err.message, errorType: err.type };
     }
   }
-  async deleteBookingPermanently(bookingId) {
+  async cancelBookingAsAdmin(bookingId, reason = 'إلغاء إداري من لوحة التحكم') {
     try {
+      // 🔒 SSOT: Routes administrative cancellations through canonical refund & cancellation engine
       const { data, error } = await this.client.rpc('admin_cancel_booking_atomic', {
         p_booking_id: bookingId,
-        p_reason: 'تمت أرشفة الحجز من قِبل إدارة المنظومة',
+        p_reason: reason || 'إلغاء إداري من لوحة التحكم',
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل أرشفة الحجز');
-      return { success: true, archived: true, data };
+      if (!data?.success) throw new Error(data?.error || data?.message || 'فشل إلغاء الحجز');
+      return { success: true, cancelled: true, data };
     } catch (e) {
-      console.error('Error in deleteBookingPermanently:', e);
+      console.error('Error in cancelBookingAsAdmin:', e);
       const err = classifyError(e);
       return { success: false, error: err.message, errorType: err.type };
     }
   }
+
+  // Backward compatibility alias for existing callers
+  async deleteBookingPermanently(bookingId, reason) {
+    return this.cancelBookingAsAdmin(bookingId, reason);
+  }
   async fetchPendingOwners() {
     try {
-      const [usersRes, unverifiedStadiumsRes, allStadiumsRes] = await Promise.all([
+      // 🔒 SSOT: Query canonical owner_documents table alongside all stadiums
+      const [usersRes, unverifiedStadiumsRes, allStadiumsRes, ownerDocsRes] = await Promise.all([
         this.client
           .from('users')
           .select('*')
@@ -157,6 +182,9 @@ class AdminService {
         this.client
           .from('stadiums')
           .select('*'),
+        this.client
+          .from('owner_documents')
+          .select('*'),
       ]);
 
       if (usersRes.error) throw usersRes.error;
@@ -164,8 +192,17 @@ class AdminService {
       const unverifiedOwnerIds = new Set((unverifiedStadiumsRes.data || []).map((s) => s.owner_id));
       const stadiumsByOwner = new Map();
       (allStadiumsRes.data || []).forEach((s) => {
-        if (s.owner_id && !stadiumsByOwner.has(s.owner_id)) {
-          stadiumsByOwner.set(s.owner_id, s);
+        if (s.owner_id) {
+          if (!stadiumsByOwner.has(s.owner_id)) stadiumsByOwner.set(s.owner_id, []);
+          stadiumsByOwner.get(s.owner_id).push(s);
+        }
+      });
+
+      const docsByOwner = new Map();
+      (ownerDocsRes?.data || []).forEach((doc) => {
+        if (doc.owner_id) {
+          if (!docsByOwner.has(doc.owner_id)) docsByOwner.set(doc.owner_id, []);
+          docsByOwner.get(doc.owner_id).push(doc);
         }
       });
 
@@ -174,9 +211,11 @@ class AdminService {
         if (isAdminRole) return false;
         const isPending = u.verification_status === 'pending' || !u.verification_status;
         const hasUnverifiedStadium = unverifiedOwnerIds.has(u.id);
+        const ownerDocs = docsByOwner.get(u.id) || [];
         const hasOwnerIntent =
           u.role === 'owner' ||
           u.has_stadium === true ||
+          ownerDocs.length > 0 ||
           Boolean(u.additional_data?.verificationDocuments) ||
           Boolean(u.additional_data?.taxCardUrl);
 
@@ -184,36 +223,32 @@ class AdminService {
       });
 
       return filtered.map((u) => {
-        const stadium = stadiumsByOwner.get(u.id) || null;
+        const stadiums = stadiumsByOwner.get(u.id) || [];
+        const primaryStadium = stadiums[0] || null;
+        const canonicalDocs = docsByOwner.get(u.id) || [];
         const addData = u.additional_data || {};
-        const docs = addData.verificationDocuments || addData.documents || {};
-        const hasDocs = Boolean(
-          docs.commercialRegisterUrl || addData.commercial_register_url ||
-          docs.taxCardUrl || addData.tax_card_url ||
-          docs.nationalIdFrontUrl || addData.national_id_front_url ||
-          docs.nationalIdBackUrl || addData.national_id_back_url ||
-          docs.leaseContractUrl || addData.lease_contract_url
+        const legacyDocs = addData.verificationDocuments || addData.documents || {};
+        
+        const hasCanonicalDocs = canonicalDocs.length > 0;
+        const hasLegacyDocs = Boolean(
+          legacyDocs.commercialRegisterUrl || addData.commercial_register_url ||
+          legacyDocs.taxCardUrl || addData.tax_card_url ||
+          legacyDocs.nationalIdFrontUrl || addData.national_id_front_url ||
+          legacyDocs.nationalIdBackUrl || addData.national_id_back_url ||
+          legacyDocs.leaseContractUrl || addData.lease_contract_url
         );
-        const hasStadium = Boolean(stadium || u.has_stadium);
-        const hasNationalId = Boolean(
-          docs.nationalIdFrontUrl || addData.national_id_front_url ||
-          docs.nationalIdBackUrl || addData.national_id_back_url
-        );
-        const hasCommercialOrContract = Boolean(
-          docs.commercialRegisterUrl || addData.commercial_register_url ||
-          docs.taxCardUrl || addData.tax_card_url ||
-          docs.leaseContractUrl || addData.lease_contract_url
-        );
-        // لا يعتبر المالك مكتملاً وجاهزاً للاعتماد إلا بوجود ملعب + وثيقة إثبات هوية رسمية أو سجل تجاري لمنع اعتماد ملاك وهميين
-        const isReadyForReview = Boolean(hasStadium && (hasNationalId || hasCommercialOrContract || hasDocs));
+        const hasDocs = hasCanonicalDocs || hasLegacyDocs;
+        const hasStadium = stadiums.length > 0 || Boolean(u.has_stadium);
+        const isReadyForReview = Boolean(hasStadium && hasDocs);
 
         return {
           ...u,
-          linkedStadium: stadium,
+          linkedStadium: primaryStadium,
+          stadiumsList: stadiums,
+          stadiumsCount: stadiums.length,
+          canonicalDocs,
           hasStadium,
           hasDocs,
-          hasNationalId,
-          hasCommercialOrContract,
           isReadyForReview,
           auditCategory: isReadyForReview ? 'ready' : 'incomplete',
         };
@@ -329,10 +364,11 @@ class AdminService {
 
   async downgradeOwnerToBasic({ ownerId }) {
     try {
+      // 🔒 SSOT: Sets canonical 'basic' plan rather than artificial 0-day free_trial
       const { data, error } = await this.client.rpc('admin_set_owner_subscription_atomic', {
         p_owner_id: ownerId,
-        p_plan: 'free_trial',
-        p_days: 0,
+        p_plan: 'basic',
+        p_days: 365,
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'فشل خفض الاشتراك');
@@ -381,9 +417,13 @@ class AdminService {
   // =========================================================================
   // MODULE C: USERS & MODERATION
   // =========================================================================
-  async fetchAllUsers({ searchQuery = '', roleFilter = 'all', statusFilter = 'all' }) {
+  async fetchAllUsers({ searchQuery = '', roleFilter = 'all', statusFilter = 'all', limit = 200 }) {
     try {
-      let query = this.client.from('users').select('*').order('created_at', { ascending: false });
+      let query = this.client
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(Number(limit) || 200);
 
       if (searchQuery.trim()) {
         const q = searchQuery.trim();
@@ -484,14 +524,7 @@ class AdminService {
 
   async deleteUserPermanently(userId) {
     try {
-      // Logic Guard: Never delete co-founder accounts
-      const { data: targetUser } = await this.client.from('users').select('email, role').eq('id', userId).maybeSingle();
-      const COFOUNDER_EMAILS = ['mohamedsalh333555@gmail.com', 'admin@vsp.com', 'hana.ramadan@vsp.com', 'ceo@vsp.com'];
-      if (targetUser && (COFOUNDER_EMAILS.includes((targetUser.email || '').toLowerCase()) || ['co_founder', 'cofounder'].includes(targetUser.role))) {
-        return { success: false, error: 'لا يمكن حذف حساب مؤسس شريك محمي نهائياً' };
-      }
-
-      // 🔒 Strict Security: Atomic RPC only, no direct delete fallback
+      // 🔒 Server Authority: delete_user_permanently enforces co-founder, active booking, and debt protection atomically
       const { data, error } = await this.client.rpc('delete_user_permanently', {
         p_user_id: userId,
       });
@@ -499,6 +532,10 @@ class AdminService {
       if (error) {
         console.error('[AdminService] delete_user_permanently failed:', error);
         throw new Error(`فشل حذف المستخدم: ${error.message}`);
+      }
+
+      if (data && data.success === false) {
+        throw new Error(data.message || data.error || 'فشل حذف المستخدم من المنظومة');
       }
 
       return { success: true, data };
@@ -511,17 +548,13 @@ class AdminService {
 
   async approveAdminUser(userId) {
     try {
-      const { error } = await this.client
-        .from('users')
-        .update({
-          role: 'admin',
-          is_blocked: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
-
-      if (error) throw error;
-      return { success: true };
+      const { data, error } = await this.client.rpc('admin_set_admin_role_atomic', {
+        p_user_id: userId,
+        p_role: 'admin',
+      });
+      if (error) throw new Error(`فشل ترقية المستخدم لأدمن: ${error.message}`);
+      if (data && data.success === false) throw new Error(`فشل ترقية المستخدم لأدمن: ${data.error || 'خطأ غير معروف'}`);
+      return { success: true, data };
     } catch (e) {
       console.error('Error in approveAdminUser:', e);
       const err = classifyError(e);
@@ -705,10 +738,21 @@ class AdminService {
     awayScore = null,
   }) {
     try {
-      // 🔒 Strict Security: Atomic RPC only, no direct table fallback
+      const allowedOutcomes = ['home_win', 'away_win', 'draw', 'cancelled'];
+      if (!allowedOutcomes.includes(winnerOutcome)) {
+        return { success: false, error: 'النتيجة غير صالحة. المقبول: home_win, away_win, draw, cancelled' };
+      }
+
+      const p_home = (homeScore !== null && homeScore !== undefined && String(homeScore).trim() !== '') ? Number(homeScore) : null;
+      const p_away = (awayScore !== null && awayScore !== undefined && String(awayScore).trim() !== '') ? Number(awayScore) : null;
+
+      // 🔒 Single Atomic Server Transaction: Updates booking outcome, scores, notes, cleans pending, notifies teams, and audits
       const { data, error } = await this.client.rpc('admin_resolve_dispute_atomic', {
         p_booking_id: bookingId,
         p_final_outcome: winnerOutcome,
+        p_home_score: p_home,
+        p_away_score: p_away,
+        p_notes: resolutionNotes || null,
       });
 
       if (error) {
@@ -720,32 +764,6 @@ class AdminService {
         throw new Error(`فشل فض النزاع: ${data.message || data.error || 'خطأ غير معروف'}`);
       }
 
-      // توثيق وحفظ ملاحظات الحكم والأهداف وقرار الاسترداد في سجل الحجز
-      try {
-        const bookingUpdates = {
-          updated_at: new Date().toISOString(),
-        };
-        if (resolutionNotes) {
-          bookingUpdates.dispute_notes = resolutionNotes;
-        }
-        if (homeScore !== null && homeScore !== undefined && String(homeScore).trim() !== '') {
-          bookingUpdates.home_team_score = Number(homeScore);
-          bookingUpdates.host_score = Number(homeScore);
-        }
-        if (awayScore !== null && awayScore !== undefined && String(awayScore).trim() !== '') {
-          bookingUpdates.away_team_score = Number(awayScore);
-          bookingUpdates.away_score = Number(awayScore);
-        }
-        if (winnerOutcome === 'cancelled') {
-          bookingUpdates.status = 'cancelled';
-          bookingUpdates.cancellation_reason = resolutionNotes ? `ملغي بقرار فض النزاع: ${resolutionNotes}` : 'ملغي بقرار إدارة المنظومة وفض النزاع (استرداد العربون)';
-          bookingUpdates.cancelled_at = new Date().toISOString();
-        }
-        await this.client.from('bookings').update(bookingUpdates).eq('id', bookingId);
-      } catch (noteErr) {
-        console.warn('Booking dispute details update note:', noteErr);
-      }
-
       return { success: true, data };
     } catch (e) {
       console.error('Error in resolveDispute:', e);
@@ -754,61 +772,82 @@ class AdminService {
     }
   }
 
-  async fetchReports() {
+  async fetchReports({ statusFilter = 'all' } = {}) {
     try {
-      const { data, error } = await this.client
+      let query = this.client
         .from('reports')
-        .select('*')
+        .select('*, users:reporter_id(name, phone, email)')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        // Fallback without relation
+        let fallbackQuery = this.client
+          .from('reports')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (statusFilter && statusFilter !== 'all') {
+          fallbackQuery = fallbackQuery.eq('status', statusFilter);
+        }
+        const fallback = await fallbackQuery;
+        if (fallback.error) throw fallback.error;
+        return { success: true, data: fallback.data || [] };
+      }
+      return { success: true, data: data || [] };
     } catch (e) {
       console.error('Error in fetchReports:', e);
-      throw e;
+      return { success: false, data: [], error: e.message };
     }
   }
 
-  // =========================================================================
-  // MODULE F: VSP OFFICIAL 1v1 LEAGUE MANAGER
-  // =========================================================================
-  async fetch1v1LeaguePlayers() {
+  async resolveReport({ reportId, status = 'resolved', notes = '' }) {
     try {
-      const { data, error } = await this.client
-        .from('vsp_1vs1_players')
-        .select('*')
-        .order('total_points', { ascending: false });
+      const { data, error } = await this.client.rpc('admin_resolve_report_atomic', {
+        p_report_id: reportId,
+        p_status: status,
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
-      return data || [];
+      if (data && data.success === false) {
+        throw new Error(data.error || 'فشل تحديث حالة البلاغ');
+      }
+      return { success: true, data };
     } catch (e) {
-      console.error('Error in fetch1v1LeaguePlayers:', e);
-      throw e;
+      console.error('Error resolving report:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
     }
   }
+
+  // =========================================================================
+  // MODULE F: VSP OFFICIAL 1v1 LEAGUE & REGISTRATION MANAGER
+  // =========================================================================
 
   async fetch1v1PendingRegistrations() {
     try {
-      // Try with user relation
       const { data, error } = await this.client
         .from('vsp_1v1_registrations')
         .select('*, users(name, phone, profile_image_url, email)')
         .or('status.eq.pending,status.is.null')
         .order('created_at', { ascending: false });
 
-      if (!error && data) return data;
+      if (!error && data) return { success: true, data };
 
-      // Fallback without relation
       const fallback = await this.client
         .from('vsp_1v1_registrations')
         .select('*')
         .or('status.eq.pending,status.is.null')
         .order('created_at', { ascending: false });
 
-      return fallback.data || [];
+      return { success: true, data: fallback.data || [] };
     } catch (e) {
       console.error('Error in fetch1v1PendingRegistrations:', e);
-      throw e;
+      return { success: false, data: [], error: e.message };
     }
   }
 
@@ -822,7 +861,8 @@ class AdminService {
       if (error) throw error;
       return count || 0;
     } catch (e) {
-      throw e;
+      console.error('Error in fetch1v1ApprovedCount:', e);
+      return 0;
     }
   }
 
@@ -838,13 +878,16 @@ class AdminService {
       }
       throw new Error('VSP 1v1 registration gate is unavailable in Supabase.');
     } catch (e) {
+      console.error('Error fetching 1v1 gate status:', e);
       throw e;
     }
   }
 
   async set1v1RegistrationOpenStatus(isOpen) {
     try {
-      const { data, error } = await this.client.rpc('admin_set_1v1_registration_open_atomic', { p_is_open: Boolean(isOpen) });
+      const { data, error } = await this.client.rpc('admin_set_1v1_registration_open_atomic', {
+        p_is_open: Boolean(isOpen),
+      });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'فشل تحديث بوابة التسجيل');
       return { success: true };
@@ -855,46 +898,19 @@ class AdminService {
     }
   }
 
-  async startNew1v1SeasonWipeRegistrations() {
-    try {
-      const { error } = await this.client
-        .from('vsp_1v1_registrations')
-        .delete()
-        .not('id', 'is', null);
-
-      if (error) throw error;
-      return { success: true };
-    } catch (e) {
-      console.error('Error wiping 1v1 registrations:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
   async approve1v1Registration({ registrationId, name, avatarUrl = '' }) {
     try {
-      // 1. Mark registration approved
-      const { error: regErr } = await this.client
-        .from('vsp_1v1_registrations')
-        .update({ status: 'approved' })
-        .eq('id', registrationId);
-
-      if (regErr) throw regErr;
-
-      // 2. Add to 1v1 players roster
-      const { error: playerErr } = await this.client.from('vsp_1vs1_players').insert({
-        name: name || '1v1 Player',
-        avatar_url: avatarUrl || '',
-        total_points: 0,
-        skill_points: 0,
-        goals: 0,
-        tackles: 0,
-        titles: 0,
-        trend: 'stable',
+      const { data, error } = await this.client.rpc('admin_approve_1v1_registration_atomic', {
+        p_registration_id: registrationId,
+        p_name: name || '',
+        p_avatar_url: avatarUrl || '',
       });
 
-      if (playerErr) throw playerErr;
-      return { success: true };
+      if (error) throw error;
+      if (data && data.success === false) {
+        throw new Error(data.error || 'فشل اعتماد التسجيل');
+      }
+      return { success: true, data };
     } catch (e) {
       console.error('Error approving 1v1 registration:', e);
       const err = classifyError(e);
@@ -904,13 +920,15 @@ class AdminService {
 
   async reject1v1Registration(registrationId) {
     try {
-      const { error } = await this.client
-        .from('vsp_1v1_registrations')
-        .update({ status: 'rejected', updated_at: new Date().toISOString() })
-        .eq('id', registrationId);
+      const { data, error } = await this.client.rpc('admin_reject_1v1_registration_atomic', {
+        p_registration_id: registrationId,
+      });
 
       if (error) throw error;
-      return { success: true };
+      if (data && data.success === false) {
+        throw new Error(data.error || 'فشل رفض التسجيل');
+      }
+      return { success: true, data };
     } catch (e) {
       console.error('Error rejecting 1v1 registration:', e);
       const err = classifyError(e);
@@ -920,12 +938,12 @@ class AdminService {
 
   async reset1v1Round() {
     try {
-      const { error } = await this.client
-        .from('vsp_1v1_registrations')
-        .update({ status: 'archived', updated_at: new Date().toISOString() });
-
+      const { data, error } = await this.client.rpc('admin_reset_1v1_round_atomic');
       if (error) throw error;
-      return { success: true };
+      if (data && data.success === false) {
+        throw new Error(data.error || 'فشل أرشفة جولة التسجيل');
+      }
+      return { success: true, data };
     } catch (e) {
       console.error('Error resetting 1v1 round:', e);
       const err = classifyError(e);
@@ -933,84 +951,22 @@ class AdminService {
     }
   }
 
-  async add1v1Player({ name, avatarUrl = '', initialPoints = 0 }) {
+  async fetch1v1FailedRefunds() {
     try {
       const { data, error } = await this.client
-        .from('vsp_1vs1_players')
-        .insert({
-          name,
-          avatar_url: avatarUrl,
-          total_points: Number(initialPoints),
-          skill_points: 0,
-          goals: 0,
-          tackles: 0,
-          titles: 0,
-          trend: 'stable',
-        })
-        .select()
-        .single();
+        .from('vsp_1v1_tournament_orders')
+        .select('id, user_id, amount, order_reference, paymob_transaction_id, created_at, updated_at')
+        .eq('payment_status', 'refund_failed_manual_review')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return { success: true, data };
+      return { success: true, data: data || [] };
     } catch (e) {
-      console.error('Error adding 1v1 player:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
+      console.error('Error fetching 1v1 failed refunds:', e);
+      return { success: false, data: [], error: e.message };
     }
   }
 
-  async publish1v1Standings(playersList) {
-    try {
-      const { data, error } = await this.client.rpc('admin_publish_legacy_1v1_standings_atomic', {
-        p_players: Array.isArray(playersList) ? playersList : [],
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'فشل نشر جدول 1v1');
-      return { success: true, data };
-    } catch (e) {
-      console.error('Error in publish1v1Standings:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-  async wipe1v1TournamentData() {
-    try {
-      await this.client.from('vsp_1vs1_players').delete().not('id', 'is', null);
-      await this.client.from('vsp_1v1_registrations').delete().not('id', 'is', null);
-      return { success: true };
-    } catch (e) {
-      console.error('Error in wipe1v1TournamentData:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-  async update1v1PlayerStats(playerId, stats) {
-    try {
-      const { error } = await this.client
-        .from('vsp_1vs1_players')
-        .update({
-          total_points: Number(stats.total_points || 0),
-          skill_points: Number(stats.skill_points || 0),
-          goals: Number(stats.goals || 0),
-          tackles: Number(stats.tackles || 0),
-          titles: Number(stats.titles || 0),
-          trend: stats.trend || 'stable',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', playerId);
-
-      if (error) throw error;
-      return { success: true };
-    } catch (e) {
-      console.error('Error updating 1v1 player stats:', e);
-      const err = classifyError(e);
-      return { success: false, error: err.message, errorType: err.type };
-    }
-  }
-
-
-  // =========================================================================
   // MODULE F.2: VSP 1v1 TOURNAMENT SYSTEM (NEW TABLES & ATOMIC RPC)
   // =========================================================================
 
@@ -1357,7 +1313,7 @@ class AdminService {
         };
       });
 
-      // 3. Overall System Financial KPIs
+      // 3. Overall System Financial KPIs (Authoritative Separation of Metrics)
       const totalGrossSystemVolume = ownerMatrix.reduce((sum, o) => sum + o.grossVolume, 0);
       const totalOnlineCollected = ownerMatrix.reduce((sum, o) => sum + o.onlineVolume, 0);
       const totalPlatformRevenue = ownerMatrix.reduce((sum, o) => sum + o.platformCommission, 0);
@@ -1371,6 +1327,7 @@ class AdminService {
         ownerMatrix,
         transactions,
         settlements,
+        isUnavailable: false,
         kpis: {
           totalGrossSystemVolume,
           totalOnlineCollected,
@@ -1383,32 +1340,98 @@ class AdminService {
     } catch (e) {
       console.error('[AdminService] Error in fetchFinancialOverview from SSOT view:', e);
       const err = classifyError(e);
+      // 🔒 Zero-Trust: Never fallback to 0 EGP on financial query failure
       return {
         ownerMatrix: [],
         transactions: [],
         settlements: [],
-        kpis: {
-          totalGrossSystemVolume: 0,
-          totalOnlineCollected: 0,
-          totalPlatformRevenue: 0,
-          totalPendingOwnerDues: 0,
-          totalEscrowHeld: 0,
-          totalSettledPayouts: 0,
-        },
-        error: err.message,
+        kpis: null,
+        isUnavailable: true,
+        error: err.message || 'تعذر مطابقة البيانات المالية من السيرفر',
         errorType: err.type,
       };
     }
   }
 
-  async fetchFinancialTransactions() {
+  async fetchFinancialTransactions({ limit = 150 } = {}) {
     const { data, error } = await this.client
       .from('transactions')
       .select('*, users(name, phone, role)')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(Number(limit) || 150);
 
     if (error) throw error;
     return data || [];
+  }
+
+    // =========================================================================
+  // FAILED REFUNDS WORKFLOW (Stage 10)
+  // =========================================================================
+  async fetchFailedRefunds() {
+    try {
+      const [bookingsRes, queueRes] = await Promise.all([
+        this.client
+          .from('bookings')
+          .select('id, user_id, stadium_name, total_price, deposit_paid, payment_status, payment_method, cancellation_reason, created_at, updated_at')
+          .in('payment_status', ['refund_failed', 'refund_pending'])
+          .order('updated_at', { ascending: false }),
+        this.client
+          .from('cancellation_refund_queue')
+          .select('*')
+          .in('status', ['failed', 'manual_review'])
+          .order('created_at', { ascending: false }),
+      ]);
+
+      const failedBookings = bookingsRes.data || [];
+      const failedQueue = queueRes.data || [];
+
+      return {
+        success: true,
+        failedBookings,
+        failedQueue,
+        totalFailedCount: failedBookings.length + failedQueue.length,
+      };
+    } catch (e) {
+      console.error('Error in fetchFailedRefunds:', e);
+      const err = classifyError(e);
+      return { success: false, failedBookings: [], failedQueue: [], totalFailedCount: 0, error: err.message };
+    }
+  }
+
+  async resolveFailedRefund({ bookingId, queueId, referenceNumber, notes }) {
+    try {
+      const now = new Date().toISOString();
+      if (bookingId) {
+        const { error } = await this.client
+          .from('bookings')
+          .update({
+            payment_status: 'refunded',
+            refund_transaction_id: referenceNumber || null,
+            refund_notes: notes || 'تمت التسوية والاسترداد يدوياً من الإدارة',
+            refunded_at: now,
+            updated_at: now,
+          })
+          .eq('id', bookingId);
+        if (error) throw error;
+      }
+      if (queueId) {
+        const { error } = await this.client
+          .from('cancellation_refund_queue')
+          .update({
+            status: 'processed',
+            failure_reason: `Manual admin resolution: ${notes || ''} (Ref: ${referenceNumber || 'N/A'})`,
+            processed_at: now,
+            updated_at: now,
+          })
+          .eq('id', queueId);
+        if (error) throw error;
+      }
+      return { success: true };
+    } catch (e) {
+      console.error('Error in resolveFailedRefund:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
   }
 
   async recordSmartOwnerSettlement({ ownerId, amount, method = 'vodafone_cash', referenceNumber }) {
@@ -1508,45 +1531,54 @@ class AdminService {
     notificationType = 'announcement',
   }) {
     try {
-      let query = this.client.from('users').select('id, role');
-
-      if (targetAudience === 'players') {
-        query = query.or('role.eq.player,role.is.null');
-      } else if (targetAudience === 'owners') {
-        query = query.eq('role', 'owner');
+      if (!title?.trim() || !body?.trim()) {
+        return { success: false, error: 'عنوان ونص الإشعار مطلوبان' };
       }
 
-      const { data: users, error: usersErr } = await query;
-      if (usersErr) throw usersErr;
+      const { data, error } = await this.client.rpc('admin_send_broadcast_notification_atomic', {
+        p_title: title.trim(),
+        p_body: body.trim(),
+        p_target_audience: targetAudience,
+        p_type: notificationType,
+      });
 
-      if (!users || users.length === 0) {
-        return { success: false, count: 0, error: 'لا يوجد مستخدمين مسجلين في الفئة المحددة' };
+      if (error) throw error;
+      if (data && data.success === false) {
+        throw new Error(data.error || 'فشل إرسال الإشعار الجماعي');
       }
 
-      const payloads = users.map((u) => ({
-        user_id: u.id,
-        title,
-        body,
-        message: body,
-        type: notificationType,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      }));
-
-      // Insert in chunks of 100 to avoid payload size limit
-      const chunkSize = 100;
-      for (let i = 0; i < payloads.length; i += chunkSize) {
-        const chunk = payloads.slice(i, i + chunkSize);
-        const { error: insertError } = await this.client.from('notifications').insert(chunk);
-        if (insertError) throw insertError;
-      }
-
-      return { success: true, count: payloads.length };
+      return { success: true, count: data?.sent_count || 0, data };
     } catch (e) {
       console.error('Error sending broadcast notification:', e);
-      return { success: false, count: 0, error: e.message };
+      const err = classifyError(e);
+      return { success: false, count: 0, error: err.message, errorType: err.type };
+    }
+  }
+  async fetchSystemAuditLogs({ actionFilter = 'all', tableFilter = 'all', limit = 100 } = {}) {
+    try {
+      let query = this.client
+        .from('system_audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(Number(limit) || 100);
+
+      if (actionFilter && actionFilter !== 'all') {
+        query = query.eq('action', actionFilter);
+      }
+
+      if (tableFilter && tableFilter !== 'all') {
+        query = query.eq('table_name', tableFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return { success: true, data: data || [] };
+    } catch (e) {
+      console.error('Error fetching system audit logs:', e);
+      return { success: false, data: [], error: e.message };
     }
   }
 }
 
 export const adminService = new AdminService();
+

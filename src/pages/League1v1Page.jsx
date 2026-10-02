@@ -155,16 +155,10 @@ export const League1v1Page = () => {
     setRegistrations(regRes.data || []);
    }
 
-   // 5. Fetch failed refunds
-   try {
-     const { data: refundsData } = await supabase
-       .from('vsp_1v1_tournament_orders')
-       .select('id, user_id, amount, order_reference, paymob_transaction_id, created_at, updated_at')
-       .eq('payment_status', 'refund_failed_manual_review')
-       .order('created_at', { ascending: false });
-     setFailedRefunds(refundsData || []);
-   } catch (refErr) {
-     console.warn('Notice: Error loading failed refunds:', refErr);
+   // 5. Fetch failed refunds via canonical service
+   const refRes = await adminService.fetch1v1FailedRefunds();
+   if (refRes.success) {
+     setFailedRefunds(refRes.data || []);
    }
   } catch (e) {
    console.error('Error loading 1v1 data:', e);
@@ -196,22 +190,31 @@ export const League1v1Page = () => {
  };
 
  useEffect(() => {
- loadData();
+   loadData();
 
- // Subscribe to realtime registrations
- const channel = supabase
- .channel('admin_1v1_realtime_' + Date.now())
- .on('postgres_changes', { event: '*', schema: 'public', table: 'vsp_1v1_tournament_players' }, () => {
- loadData();
- })
- .on('postgres_changes', { event: '*', schema: 'public', table: 'vsp_1v1_tournaments' }, () => {
- loadData();
- })
- .subscribe();
+   let debounceTimer = null;
+   const debouncedReload = () => {
+     if (debounceTimer) clearTimeout(debounceTimer);
+     debounceTimer = setTimeout(() => {
+       loadData();
+     }, 1500);
+   };
 
- return () => {
- channel.unsubscribe();
- };
+   // Subscribe to realtime registrations and tournaments with debouncing
+   const channel = supabase
+     .channel('admin_1v1_realtime_' + Date.now())
+     .on('postgres_changes', { event: '*', schema: 'public', table: 'vsp_1v1_tournament_players' }, () => {
+       debouncedReload();
+     })
+     .on('postgres_changes', { event: '*', schema: 'public', table: 'vsp_1v1_tournaments' }, () => {
+       debouncedReload();
+     })
+     .subscribe();
+
+   return () => {
+     if (debounceTimer) clearTimeout(debounceTimer);
+     supabase.removeChannel(channel);
+   };
  }, []);
 
  // -------------------------------------------------------------------------

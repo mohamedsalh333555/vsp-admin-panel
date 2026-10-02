@@ -30,6 +30,10 @@ export const PayoutSettlementsPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('matrix'); // 'matrix' | 'ledger' | 'requests'
   const [search, setSearch] = useState('');
+  const [failedRefunds, setFailedRefunds] = useState({ failedBookings: [], failedQueue: [], totalFailedCount: 0 });
+  const [selectedRefund, setSelectedRefund] = useState(null);
+  const [refundResolveForm, setRefundResolveForm] = useState({ referenceNumber: '', notes: '' });
+  const [isResolvingRefund, setIsResolvingRefund] = useState(false);
 
   // Financial Data
   const [financialData, setFinancialData] = useState({
@@ -66,11 +70,17 @@ export const PayoutSettlementsPage = () => {
   const loadFinancials = async () => {
     setLoading(true);
     try {
-      const data = await adminService.fetchFinancialOverview();
+      const [data, refundsData] = await Promise.all([
+        adminService.fetchFinancialOverview(),
+        adminService.fetchFailedRefunds(),
+      ]);
       if (data && !data.error && data.ownerMatrix) {
         setFinancialData(data);
       } else if (data?.error) {
         showToast(data.error, 'error');
+      }
+      if (refundsData?.success) {
+        setFailedRefunds(refundsData);
       }
     } catch (e) {
       showToast(t('error_loading'), 'error');
@@ -204,6 +214,58 @@ export const PayoutSettlementsPage = () => {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Manual Refund Settlement Modal */}
+      {selectedRefund && (
+        <Modal
+          isOpen={Boolean(selectedRefund)}
+          onClose={() => setSelectedRefund(null)}
+          title={isRTL ? 'تسوية استرداد مالي يدوي' : 'Manual Refund Settlement'}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-vsp-card border border-vsp-border rounded-xl flex items-center justify-between">
+              <span className="text-zinc-400">{isRTL ? 'المبلغ المطلوب استرداده:' : 'Refund Amount:'}</span>
+              <span className="font-bold text-white font-mono text-sm">{selectedRefund.amount} {t('currency')}</span>
+            </div>
+            <div>
+              <label className="text-zinc-400 block mb-1 font-medium">{isRTL ? 'رقم مرجع التحويل / الحوالة البنكية / المحفظة *' : 'Transfer Reference # *'}</label>
+              <input
+                type="text"
+                value={refundResolveForm.referenceNumber}
+                onChange={(e) => setRefundResolveForm({ ...refundResolveForm, referenceNumber: e.target.value })}
+                placeholder={isRTL ? 'مثال: IPN-984321 أو REF-5544' : 'e.g. IPN-984321'}
+                className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-vsp-accent"
+              />
+            </div>
+            <div>
+              <label className="text-zinc-400 block mb-1 font-medium">{isRTL ? 'ملاحظات التسوية الإدارية' : 'Admin Notes'}</label>
+              <textarea
+                value={refundResolveForm.notes}
+                onChange={(e) => setRefundResolveForm({ ...refundResolveForm, notes: e.target.value })}
+                placeholder={isRTL ? 'ملاحظات إضافية بخصوص التحويل اليدوي للاعب...' : 'Additional notes...'}
+                className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-vsp-accent resize-none h-16"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedRefund(null)}
+                className="px-4 py-2 bg-vsp-card border border-vsp-border text-zinc-300 hover:text-white rounded-xl font-bold"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleResolveRefund}
+                disabled={isResolvingRefund}
+                className="px-4 py-2 bg-vsp-accent hover:bg-emerald-400 text-black font-bold rounded-xl transition-all disabled:opacity-50"
+              >
+                {isResolvingRefund ? t('loading') : (isRTL ? 'تأكيد التسوية والاسترداد' : 'Confirm Settlement')}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {toast && (
         <Toast
           message={toast.message}
@@ -300,6 +362,22 @@ export const PayoutSettlementsPage = () => {
             {t('tab_ledger')} ({financialData.transactions.length})
           </button>
 
+          <button
+            onClick={() => setActiveTab('failed_refunds')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 ${
+              activeTab === 'failed_refunds'
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                : 'text-zinc-400 hover:text-white hover:bg-vsp-surface'
+            }`}
+          >
+            <Danger className="w-4 h-4" variant="Outline" />
+            <span>{isRTL ? 'الاستردادات المعلقة' : 'Failed Refunds'}</span>
+            {failedRefunds.totalFailedCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white">
+                {failedRefunds.totalFailedCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setActiveTab('requests')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${

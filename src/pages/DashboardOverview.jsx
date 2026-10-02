@@ -44,7 +44,9 @@ export const DashboardOverview = ({ onNavigate }) => {
     totalUsers: 0,
     totalStadiums: 0,
     totalBookings: 0,
-    totalRevenue: 0,
+    totalGrossVolume: null,
+    totalPlatformRevenue: null,
+    financialUnavailable: false,
     total1v1Players: 0,
     pendingOwners: 0,
     disputesCount: 0,
@@ -102,19 +104,28 @@ export const DashboardOverview = ({ onNavigate }) => {
   useEffect(() => {
     loadData();
 
-    // Setup Realtime listener on bookings table to update live feed
+    // Setup Realtime listener on bookings table to update live feed with debounce
+    let debounceTimer = null;
+    const debouncedReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadData(true);
+      }, 1500);
+    };
+
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('dashboard-bookings-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings' },
         () => {
-          loadData(true);
+          debouncedReload();
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -188,10 +199,12 @@ export const DashboardOverview = ({ onNavigate }) => {
       subtext: t('kpi_bookings_subtext'),
     },
     {
-      label: t('total_revenue'),
-      value: `${stats.totalRevenue.toLocaleString()} ${t('currency')}`,
+      label: t('gross_booking_volume') || (isAr ? 'إجمالي حجم التداول' : 'Gross Volume'),
+      value: stats.financialUnavailable || stats.totalGrossVolume === null
+        ? (isAr ? 'غير متاح' : 'Unavailable')
+        : `${stats.totalGrossVolume.toLocaleString()} ${t('currency')}`,
       icon: Money2,
-      subtext: t('kpi_revenue_subtext'),
+      subtext: isAr ? 'إجمالي قيمة جميع الحجوزات' : 'Gross System Volume',
     },
   ];
 
@@ -368,7 +381,7 @@ export const DashboardOverview = ({ onNavigate }) => {
                 {isAr ? 'تسويات معلقة' : 'Pending Payouts'}
               </span>
               <span className="text-sm font-black text-white font-mono mt-0.5 block">
-                {stats.pendingPayouts.toLocaleString()} {t('currency')}
+                {stats.pendingPayouts !== null ? `${stats.pendingPayouts.toLocaleString()} ${t('currency')}` : (isAr ? 'قيد المطابقة' : 'Reconciling')}
               </span>
               {stats.totalEscrowHeld > 0 && (
                 <span className="text-[10px] text-amber-400/90 font-mono block mt-0.5">
@@ -808,7 +821,7 @@ export const DashboardOverview = ({ onNavigate }) => {
                 className="px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
               >
                 <Trash className="w-3.5 h-3.5" variant="Outline" />
-                <span>{t('delete_permanent')}</span>
+                <span>{t('cancel_booking_action') || (isAr ? 'إلغاء الحجز إدارياً' : 'Cancel Booking')}</span>
               </button>
 
               <div className="flex items-center gap-2">

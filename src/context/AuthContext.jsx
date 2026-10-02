@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
         const isCoFounder = data.role === 'cofounder' || data.role === 'co_founder';
         const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(data.role?.toLowerCase());
         // أمان تام: التحقق من أن الدور إداري فعلياً وأن الحساب غير محظور
-        const isApprovedAdmin = !data.is_blocked && (isCoFounder || (isAdminRole && data.verification_status === 'approved'));
+        const isApprovedAdmin = !data.is_blocked && isAdminRole;
 
         // قراءة المنصب مباشرة من عمود position في الداتابيز، وتصحيح المنصب الافتراضي بدقة
         let livePosition = data.position?.trim();
@@ -114,7 +114,7 @@ export const AuthProvider = ({ children }) => {
 
       const isCoFounder = userData?.role === 'cofounder' || userData?.role === 'co_founder';
       const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(userData?.role?.toLowerCase());
-      const isApprovedAdmin = isCoFounder || (isAdminRole && userData?.verification_status === 'approved');
+      const isApprovedAdmin = !userData?.is_blocked && isAdminRole;
 
       if (!isApprovedAdmin) {
         await supabase.auth.signOut();

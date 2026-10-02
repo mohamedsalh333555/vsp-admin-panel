@@ -228,10 +228,35 @@ class BannersService {
   }
 
   /**
-   * Delete a banner permanently
+   * Delete a banner permanently and clean up its file from storage
    */
   async deleteBanner(bannerId) {
     try {
+      // 1. Fetch banner to extract image_url before deletion
+      const { data: banner } = await this.client
+        .from('banners')
+        .select('image_url')
+        .eq('id', bannerId)
+        .maybeSingle();
+
+      // 2. Clean up storage if image is hosted in 'banners' bucket
+      if (banner?.image_url) {
+        try {
+          const url = banner.image_url;
+          const marker = '/banners/';
+          const markerIndex = url.indexOf(marker);
+          if (markerIndex !== -1) {
+            const storagePath = decodeURIComponent(url.substring(markerIndex + marker.length).split('?')[0]);
+            if (storagePath) {
+              await this.client.storage.from('banners').remove([storagePath]);
+            }
+          }
+        } catch (storageErr) {
+          console.warn('Notice: Non-blocking error cleaning up banner storage object:', storageErr);
+        }
+      }
+
+      // 3. Delete database record
       const { error } = await this.client
         .from('banners')
         .delete()

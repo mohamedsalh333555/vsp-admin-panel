@@ -17,12 +17,13 @@ import { TournamentControlPage } from './pages/TournamentControlPage';
 import { TeamLeagueControlPage } from './pages/TeamLeagueControlPage';
 import { BannersManagementPage } from './pages/BannersManagementPage';
 import { CRMSettingsPage } from './pages/CRMSettingsPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 import { Clock, Logout, RotateRight } from 'iconsax-react';
 
 const VALID_TABS = [
   'dashboard', 'owner_audits', 'owner_subscriptions', 'users',
   'disputes', 'payout_settlements', 'league_1v1', 'team_leagues', 'tournaments',
-  'banners', 'settings',
+  'banners', 'settings', 'audit_logs',
 ];
 
 const getInitialTab = () => {
@@ -122,6 +123,8 @@ export default function App() {
         return <BannersManagementPage />;
       case 'settings':
         return <CRMSettingsPage />;
+      case 'audit_logs':
+        return <AuditLogsPage />;
       default:
         return <DashboardOverview onNavigate={setActiveTab} />;
     }
@@ -151,6 +154,8 @@ export default function App() {
         return t('banners');
       case 'settings':
         return t('settings');
+      case 'audit_logs':
+        return t('audit_logs');
       default:
         return t('dashboard');
     }

@@ -22,6 +22,10 @@ import {
   Sms,
   UserRemove,
   Building,
+  Danger,
+  MessageText,
+  CloseCircle,
+  DocumentText,
 } from 'iconsax-react';
 
 export const UsersModerationPage = () => {
@@ -35,6 +39,16 @@ export const UsersModerationPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [processingId, setProcessingId] = useState(null);
 
+  // Tab state: 'users' | 'reports'
+  const [activeModerationTab, setActiveModerationTab] = useState('users');
+
+  // Reports state
+  const [reports, setReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportStatusFilter, setReportStatusFilter] = useState('all');
+  const [reportActionModal, setReportActionModal] = useState(null); // { report, targetStatus: 'resolved' | 'dismissed' }
+  const [reportNotes, setReportNotes] = useState('');
+
   // Delete modal state
   const [userToDelete, setUserToDelete] = useState(null);
 
@@ -43,23 +57,11 @@ export const UsersModerationPage = () => {
 
   const [toast, setToast] = useState(null);
 
-  const COFOUNDER_EMAILS = [
-    'mohamedsalh333555@gmail.com',
-    'admin@vsp.com',
-    'coo@vsp.com',
-    'hana.ramadan@vsp.com',
-    'ceo@vsp.com',
-  ];
-
   const isProtectedUser = (target) => {
     if (!target) return false;
     if (currentAuthUser && target.id === currentAuthUser.id) return true;
-    const email = (target.email || '').toLowerCase().trim();
     const role = (target.role || '').toLowerCase();
-    return (
-      COFOUNDER_EMAILS.includes(email) ||
-      ['cofounder', 'co_founder', 'super_admin'].includes(role)
-    );
+    return ['cofounder', 'co_founder', 'super_admin'].includes(role);
   };
 
   const showToast = (message, type = 'success') => {
@@ -79,6 +81,53 @@ export const UsersModerationPage = () => {
       showToast(t('error_loading'), 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReportsList = async () => {
+    setReportsLoading(true);
+    try {
+      const res = await adminService.fetchReports({ statusFilter: reportStatusFilter });
+      if (res.success) {
+        setReports(res.data || []);
+      } else {
+        showToast(res.error || 'تعذر تحميل البلاغات', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'تعذر تحميل البلاغات', 'error');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeModerationTab === 'reports') {
+      fetchReportsList();
+    }
+  }, [activeModerationTab, reportStatusFilter]);
+
+  const handleExecuteReportAction = async () => {
+    if (!reportActionModal) return;
+    const { report, targetStatus } = reportActionModal;
+    setProcessingId(report.id);
+    try {
+      const res = await adminService.resolveReport({
+        reportId: report.id,
+        status: targetStatus,
+        notes: reportNotes.trim(),
+      });
+      if (res.success) {
+        showToast(targetStatus === 'resolved' ? 'تم حل البلاغ وتوثيق القرار بنجاح' : 'تم رفض وتجاهل البلاغ');
+        setReportActionModal(null);
+        setReportNotes('');
+        fetchReportsList();
+      } else {
+        showToast(res.error || 'فشلت معالجة البلاغ', 'error');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -189,10 +238,7 @@ export const UsersModerationPage = () => {
   };
 
   const renderRoleBadge = (user) => {
-    const isCoFounder =
-      user.role === 'cofounder' ||
-      user.role === 'co_founder' ||
-      COFOUNDER_EMAILS.includes((user.email || '').toLowerCase().trim());
+    const isCoFounder = ['cofounder', 'co_founder', 'super_admin'].includes((user.role || '').toLowerCase());
 
     if (isCoFounder) {
       return (
@@ -263,27 +309,59 @@ export const UsersModerationPage = () => {
         />
       )}
 
-      {/* Header */}
+      {/* Header & Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-white flex items-center gap-2">
             <Profile2User className="w-6 h-6 text-zinc-400" variant="Outline" />
-            <span>{t('users_management_title')}</span>
+            <span>{isAr ? 'الرقابة وإدارة الحسابات والبلاغات' : 'Moderation & Accounts Management'}</span>
           </h1>
           <p className="text-xs text-vsp-textSecondary mt-0.5">
-            {t('users_management_subtitle')}
+            {isAr ? 'التحكم في حسابات المستخدمين والمشرفين ومتابعة بلاغات وشكاوى المجتمع' : 'Moderate platform users, admins and resolve player reports'}
           </p>
         </div>
 
-        <button
-          onClick={fetchUsers}
-          className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white rounded-xl transition-all self-end sm:self-auto"
-        >
-          <Refresh2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} variant="Outline" />
-        </button>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="bg-vsp-surface p-1 rounded-xl border border-vsp-border flex items-center gap-1">
+            <button
+              onClick={() => setActiveModerationTab('users')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeModerationTab === 'users'
+                  ? 'bg-vsp-accent text-black shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Profile2User className="w-3.5 h-3.5" variant="Outline" />
+              <span>{isAr ? 'المستخدمين والحسابات' : 'Users & Accounts'}</span>
+            </button>
+            <button
+              onClick={() => setActiveModerationTab('reports')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeModerationTab === 'reports'
+                  ? 'bg-vsp-accent text-black shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Danger className="w-3.5 h-3.5" variant="Outline" />
+              <span>{isAr ? 'البلاغات والشكاوى' : 'Reports & Abuse'}</span>
+              {reports.filter(r => r.status === 'pending').length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              )}
+            </button>
+          </div>
+
+          <button
+            onClick={activeModerationTab === 'users' ? fetchUsers : fetchReportsList}
+            className="p-2.5 bg-vsp-surface hover:bg-vsp-card border border-vsp-border text-vsp-textSecondary hover:text-white rounded-xl transition-all"
+          >
+            <Refresh2 className={`w-4 h-4 ${(loading || reportsLoading) ? 'animate-spin' : ''}`} variant="Outline" />
+          </button>
+        </div>
       </div>
 
-      {/* Summary Chips */}
+      {activeModerationTab === 'users' ? (
+        <div className="space-y-6">
+          {/* Summary Chips */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-vsp-surface border border-vsp-border rounded-xl p-4 flex items-center justify-between shadow-sm">
           <div>
@@ -529,8 +607,211 @@ export const UsersModerationPage = () => {
           </div>
         )}
       </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Reports Summary Chips */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-vsp-surface border border-vsp-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[11px] text-vsp-textSecondary font-bold">{isAr ? 'إجمالي البلاغات المسجلة' : 'Total Reports'}</span>
+                <h3 className="text-xl font-black text-white mt-1">{reports.length}</h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-zinc-400">
+                <Danger className="w-4 h-4" variant="Outline" />
+              </div>
+            </div>
 
-      {/* Block / Unblock Confirmation Modal */}
+            <div className="bg-vsp-surface border border-vsp-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[11px] text-vsp-textSecondary font-bold">{isAr ? 'بلاغات قيد الانتظار' : 'Pending Review'}</span>
+                <h3 className="text-xl font-black text-amber-400 mt-1">{reports.filter((r) => r.status === 'pending').length}</h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <RotateRight className="w-4 h-4" variant="Outline" />
+              </div>
+            </div>
+
+            <div className="bg-vsp-surface border border-vsp-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[11px] text-vsp-textSecondary font-bold">{isAr ? 'بلاغات تم حلها ومعالجتها' : 'Resolved Reports'}</span>
+                <h3 className="text-xl font-black text-vsp-accent mt-1">{reports.filter((r) => r.status === 'resolved').length}</h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-vsp-card border border-vsp-border flex items-center justify-center text-vsp-accent">
+                <TickCircle className="w-4 h-4" variant="Outline" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="flex items-center gap-3">
+            <select
+              value={reportStatusFilter}
+              onChange={(e) => setReportStatusFilter(e.target.value)}
+              className="bg-vsp-surface border border-vsp-border rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-semibold"
+            >
+              <option value="all">{isAr ? 'جميع حالات البلاغات' : 'All Statuses'}</option>
+              <option value="pending">{isAr ? 'قيد الانتظار فقط' : 'Pending Only'}</option>
+              <option value="resolved">{isAr ? 'تم الحل والمعالجة' : 'Resolved'}</option>
+              <option value="dismissed">{isAr ? 'مرفوض / تم التجاهل' : 'Dismissed'}</option>
+            </select>
+          </div>
+
+          {/* Reports Table */}
+          <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
+            {reportsLoading ? (
+              <div className="h-64 flex items-center justify-center">
+                <RotateRight className="w-8 h-8 text-zinc-400 animate-spin" variant="Outline" />
+              </div>
+            ) : reports.length === 0 ? (
+              <EmptyState
+                icon={Danger}
+                title={isAr ? 'لا توجد بلاغات مسجلة' : 'No Reports Found'}
+                subtitle={isAr ? 'لم يقم أي مستخدم بالإبلاغ عن أي مخالفات حالياً' : 'Clean sheet! No reports found matching current filter.'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-vsp-card/50 text-vsp-textSecondary border-b border-vsp-border">
+                    <tr>
+                      <th className="px-6 py-4 font-bold">{isAr ? 'المُبلّغ' : 'Reporter'}</th>
+                      <th className="px-6 py-4 font-bold">{isAr ? 'نوع وموضوع البلاغ' : 'Target & Type'}</th>
+                      <th className="px-6 py-4 font-bold">{isAr ? 'السبب والتفاصيل' : 'Reason & Details'}</th>
+                      <th className="px-6 py-4 font-bold">{isAr ? 'الحالة' : 'Status'}</th>
+                      <th className="px-6 py-4 font-bold">{isAr ? 'التاريخ' : 'Date'}</th>
+                      <th className="px-6 py-4 font-bold text-center">{isAr ? 'الإجراء الإداري' : 'Action'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-vsp-border/50">
+                    {reports.map((rep) => {
+                      const isPending = rep.status === 'pending';
+                      const isProcessing = processingId === rep.id;
+                      const formattedDate = rep.created_at ? new Date(rep.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+
+                      return (
+                        <tr key={rep.id} className="hover:bg-vsp-card/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-white">{rep.users?.name || (isAr ? 'مستخدم مجهول' : 'Unknown User')}</div>
+                            <div className="text-[11px] text-zinc-400 font-mono mt-0.5">{rep.users?.phone || rep.reporter_id || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-[11px] font-mono text-zinc-300">
+                              {rep.target_type || 'user'}: {rep.target_id?.slice(0, 8)}...
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 max-w-xs">
+                            <div className="font-bold text-white">{rep.reason || '-'}</div>
+                            {rep.details && (
+                              <div className="text-[11px] text-zinc-400 mt-1 whitespace-pre-wrap line-clamp-2 leading-relaxed">
+                                {rep.details}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            {rep.status === 'pending' ? (
+                              <Badge variant="warning" size="sm">{isAr ? 'قيد المراجعة' : 'Pending'}</Badge>
+                            ) : rep.status === 'resolved' ? (
+                              <Badge variant="success" size="sm">{isAr ? 'تم الحل' : 'Resolved'}</Badge>
+                            ) : (
+                              <Badge variant="default" size="sm">{isAr ? 'مرفوض/متجاهل' : 'Dismissed'}</Badge>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-zinc-400 font-mono text-[11px]">
+                            {formattedDate}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {isPending ? (
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => setReportActionModal({ report: rep, targetStatus: 'resolved' })}
+                                  disabled={isProcessing}
+                                  title={isAr ? 'اعتماد وحل البلاغ' : 'Resolve Report'}
+                                  className="px-2.5 py-1.5 bg-vsp-card hover:bg-zinc-800 text-vsp-accent border border-vsp-border rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                                >
+                                  <TickCircle className="w-3.5 h-3.5" variant="Outline" />
+                                  <span>{isAr ? 'حل البلاغ' : 'Resolve'}</span>
+                                </button>
+                                <button
+                                  onClick={() => setReportActionModal({ report: rep, targetStatus: 'dismissed' })}
+                                  disabled={isProcessing}
+                                  title={isAr ? 'رفض وتجاهل البلاغ' : 'Dismiss Report'}
+                                  className="px-2.5 py-1.5 bg-vsp-card hover:bg-zinc-800 text-zinc-400 hover:text-white border border-vsp-border rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                                >
+                                  <CloseCircle className="w-3.5 h-3.5" variant="Outline" />
+                                  <span>{isAr ? 'تجاهل' : 'Dismiss'}</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-zinc-500 font-bold">{isAr ? 'تم الحسم' : 'Closed'}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Report Action Modal */}
+      <Modal
+        isOpen={Boolean(reportActionModal)}
+        onClose={() => setReportActionModal(null)}
+        title={
+          reportActionModal?.targetStatus === 'resolved'
+            ? (isAr ? 'حل واعتماد البلاغ' : 'Resolve Report')
+            : (isAr ? 'تجاهل ورفض البلاغ' : 'Dismiss Report')
+        }
+      >
+        {reportActionModal && (
+          <div className="space-y-4">
+            <p className="text-xs text-vsp-textSecondary leading-relaxed">
+              {reportActionModal.targetStatus === 'resolved'
+                ? (isAr ? 'سيتم وضع علامة على هذا البلاغ كـ "تم الحل والمعالجة" وتوثيق الملاحظات في سجل التدقيق.' : 'This report will be marked as resolved with official admin notes.')
+                : (isAr ? 'سيتم رفض البلاغ وتجاهله دون اتخاذ إجراء عقابي.' : 'This report will be dismissed as unsubstantiated.')}
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-zinc-400">
+                {isAr ? 'ملاحظات الإدارة (اختياري، تظهر في سجل البلاغ):' : 'Admin Notes:'}
+              </label>
+              <textarea
+                value={reportNotes}
+                onChange={(e) => setReportNotes(e.target.value)}
+                placeholder={isAr ? 'اكتب الإجراء المتخذ أو سبب القرار...' : 'Enter action notes or rationale...'}
+                rows={3}
+                className="w-full bg-vsp-card border border-vsp-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-zinc-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-vsp-border">
+              <button
+                onClick={() => setReportActionModal(null)}
+                className="px-4 py-2 bg-vsp-card border border-vsp-border text-zinc-300 hover:text-white rounded-xl text-xs font-bold"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleExecuteReportAction}
+                disabled={processingId !== null}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
+                  reportActionModal.targetStatus === 'resolved'
+                    ? 'bg-vsp-accent text-black font-extrabold hover:bg-vsp-accentHover'
+                    : 'bg-zinc-700 hover:bg-zinc-600 text-white'
+                }`}
+              >
+                {processingId ? <RotateRight className="w-4 h-4 animate-spin" variant="Outline" /> : <TickCircle className="w-4 h-4" variant="Outline" />}
+                <span>{isAr ? 'تأكيد وحفظ الإجراء' : 'Confirm Action'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+{/* Block / Unblock Confirmation Modal */}
       <Modal
         isOpen={Boolean(userToToggleBlock)}
         onClose={() => setUserToToggleBlock(null)}

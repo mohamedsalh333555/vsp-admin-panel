@@ -13,6 +13,7 @@ import {
   Speaker,
   Setting2,
   CloseCircle,
+  SecuritySafe,
 } from 'iconsax-react';
 
 export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobile }) => {
@@ -97,6 +98,11 @@ export const AdminSidebar = ({ activeTab, setActiveTab, mobileOpen, onCloseMobil
       id: 'settings',
       label: t('settings'),
       icon: Setting2,
+    },
+    {
+      id: 'audit_logs',
+      label: t('audit_logs'),
+      icon: SecuritySafe,
     },
   ];
 
