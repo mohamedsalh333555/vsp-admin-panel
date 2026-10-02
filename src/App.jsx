@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useLanguage } from './context/LanguageContext';
 import { AdminHeader } from './components/AdminHeader';
@@ -18,7 +18,7 @@ import { TeamLeagueControlPage } from './pages/TeamLeagueControlPage';
 import { BannersManagementPage } from './pages/BannersManagementPage';
 import { CRMSettingsPage } from './pages/CRMSettingsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
-import { Clock, Logout, RotateRight } from 'iconsax-react';
+import { Clock, Logout, RotateRight, Danger, Refresh2 } from 'iconsax-react';
 
 const VALID_TABS = [
   'dashboard', 'owner_audits', 'owner_subscriptions', 'users',
@@ -32,7 +32,7 @@ const getInitialTab = () => {
 };
 
 export default function App() {
-  const { user, profile, loading, logout } = useAuth();
+  const { user, profile, loading, profileLoadFailed, profileError, retryProfile, logout } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -62,7 +62,7 @@ export default function App() {
     );
   }
 
-  // Not logged in
+  // 1. Not logged in -> Show login
   if (!user) {
     return (
       <div className="min-h-screen bg-vsp-bg flex flex-col">
@@ -74,18 +74,74 @@ export default function App() {
     );
   }
 
-  // Pending Admin Approval check
-  if (profile && !profile.isApprovedAdmin) {
+  // 2. Profile query/network error or missing profile while user exists -> Fail-Closed Error Screen
+  if (profileLoadFailed || (!profile && user)) {
+    return (
+      <div className="min-h-screen bg-vsp-bg flex flex-col">
+        <NetworkBanner />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-vsp-surface border border-red-500/30 rounded-2xl p-8 w-full max-w-md text-center space-y-4 shadow-2xl glass-panel">
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto text-red-400">
+              <Danger variant="Outline" className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-white">تعذر التحقق من صلاحيات الحساب</h2>
+            <p className="text-xs text-vsp-textSecondary leading-relaxed">
+              فشل الاتصال بقاعدة البيانات للتحقق من بيانات وصلاحيات الحساب الإداري. حرصاً على أمان المنظومة، تم إيقاف الدخول تلقائياً.
+            </p>
+            {profileError && (
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-left font-mono text-[11px] text-red-400 break-all overflow-x-auto">
+                {profileError}
+              </div>
+            )}
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={retryProfile}
+                className="w-full py-3 bg-vsp-accent hover:bg-vsp-accentHover text-black font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md"
+              >
+                <Refresh2 variant="Outline" className="w-4 h-4" />
+                <span>إعادة المحاولة</span>
+              </button>
+              <button
+                onClick={logout}
+                className="w-full py-3 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                <Logout variant="Outline" className="w-4 h-4 text-vsp-accent" />
+                <span>{t('logout')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. User authenticated but NOT an approved active admin -> Fail-Closed Denied Screen
+  if (!profile.isApprovedAdmin) {
+    const isBlocked = Boolean(profile.is_blocked);
+    const isMissing = profile.role === 'none' || profile.role === 'guest';
+    const isPlayer = profile.role === 'player';
+
+    let title = t('pending_approval');
+    let message = t('pending_note');
+
+    if (isBlocked) {
+      title = 'تم إيقاف هذا الحساب الإداري';
+      message = 'تم حظر أو إيقاف صلاحيات هذا الحساب الإداري من قبل الإدارة العليا. يرجى التواصل مع المسؤول المباشر.';
+    } else if (isPlayer || isMissing) {
+      title = 'غير مصرح بالدخول للوحة الإدارة';
+      message = 'عفواً، لوحة التحكم مخصصة للمسؤولين المعتمدين فقط. هذا الحساب ليس لديه صلاحيات إدارية (يرجى استخدام تطبيق الموبايل).';
+    }
+
     return (
       <div className="min-h-screen bg-vsp-bg flex flex-col">
         <NetworkBanner />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-vsp-surface border border-vsp-border rounded-2xl p-8 w-full max-w-md text-center space-y-4 shadow-2xl glass-panel">
-            <div className="w-16 h-16 bg-vsp-card border border-vsp-border rounded-2xl flex items-center justify-center mx-auto text-zinc-400">
-              <Clock variant="Outline" className="w-8 h-8" />
+            <div className={`w-16 h-16 ${isBlocked ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-vsp-card border-vsp-border text-zinc-400'} border rounded-2xl flex items-center justify-center mx-auto`}>
+              {isBlocked ? <Danger variant="Outline" className="w-8 h-8" /> : <Clock variant="Outline" className="w-8 h-8" />}
             </div>
-            <h2 className="text-xl font-bold text-white">{t('pending_approval')}</h2>
-            <p className="text-xs text-vsp-textSecondary leading-relaxed">{t('pending_note')}</p>
+            <h2 className="text-xl font-bold text-white">{title}</h2>
+            <p className="text-xs text-vsp-textSecondary leading-relaxed">{message}</p>
             <button
               onClick={logout}
               className="w-full py-3 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
@@ -97,6 +153,12 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // 4. Strict fail-closed guarantee: ONLY active approved admin can view admin content
+  const isAuthorizedAdmin = Boolean(user && profile && profile.isApprovedAdmin === true);
+  if (!isAuthorizedAdmin) {
+    return null;
   }
 
   const renderContent = () => {

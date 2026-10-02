@@ -2,7 +2,7 @@
 CREATE OR REPLACE FUNCTION public.admin_resolve_report_atomic(
   p_report_id uuid,
   p_status text,
-  p_notes text DEFAULT NULL
+  p_notes text DEFAULT NULL::text
 )
 RETURNS jsonb
 LANGUAGE plpgsql

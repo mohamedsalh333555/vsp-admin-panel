@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, supabaseAdmin } from '../lib/supabase';
 
 const AuthContext = createContext();
@@ -7,40 +7,23 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Check initial auth state
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchUserProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
+  const [profileError, setProfileError] = useState(null);
 
   const fetchUserProfile = async (userId) => {
     try {
+      setProfileLoadFailed(false);
+      setProfileError(null);
       const dbClient = supabaseAdmin || supabase;
       const { data, error } = await dbClient
         .from('users')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
 
       const defaultName = 'Admin';
       const defaultPosition = 'Admin';
@@ -64,26 +47,71 @@ export const AuthProvider = ({ children }) => {
           isCoFounder,
           isApprovedAdmin,
         });
+        setProfileLoadFailed(false);
+        setProfileError(null);
       } else {
+        // Missing profile in public.users: Fail-closed with unapproved guest state
         setProfile({
           id: userId,
           email: '',
           name: defaultName,
           position: defaultPosition,
           role: 'guest',
+          is_blocked: false,
           isCoFounder: false,
           isApprovedAdmin: false,
         });
+        setProfileLoadFailed(false);
+        setProfileError(null);
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
+      setProfile(null);
+      setProfileLoadFailed(true);
+      setProfileError(err?.message || 'تعذر التحقق من صلاحيات الحساب الإداري');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    // Check initial auth state
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserProfile(session.user.id);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setProfileLoadFailed(false);
+        setProfileError(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const retryProfile = () => {
+    if (user?.id) {
+      setLoading(true);
+      fetchUserProfile(user.id);
+    }
+  };
+
   const login = async (email, password) => {
     setLoading(true);
+    setProfileLoadFailed(false);
+    setProfileError(null);
     const normalizedEmail = (email || '').toLowerCase().trim();
     const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) {
@@ -99,22 +127,34 @@ export const AuthProvider = ({ children }) => {
 
     // فحص الصلاحية الإدارية فوراً لمنع تعليق الحسابات العادية
     try {
-      const { data: userData } = await supabase
+      const dbClient = supabaseAdmin || supabase;
+      const { data: userData, error: profileErr } = await dbClient
         .from('users')
         .select('id, email, role, is_blocked, verification_status')
         .eq('id', data.user.id)
         .maybeSingle();
 
-      if (userData?.is_blocked) {
+      if (profileErr) {
+        throw profileErr;
+      }
+
+      if (!userData) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        throw new Error('لم يتم العثور على بيانات هذا المستخدم في النظام.');
+      }
+
+      if (userData.is_blocked) {
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
         throw new Error('تم حظر أو إيقاف هذا الحساب الإداري. يرجى مراجعة إدارة المنظومة.');
       }
 
-      const isCoFounder = userData?.role === 'cofounder' || userData?.role === 'co_founder';
-      const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(userData?.role?.toLowerCase());
-      const isApprovedAdmin = !userData?.is_blocked && isAdminRole;
+      const isCoFounder = userData.role === 'cofounder' || userData.role === 'co_founder';
+      const isAdminRole = ['admin', 'super_admin', 'cofounder', 'co_founder'].includes(userData.role?.toLowerCase());
+      const isApprovedAdmin = !userData.is_blocked && isAdminRole;
 
       if (!isApprovedAdmin) {
         await supabase.auth.signOut();
@@ -173,13 +213,30 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Error signing out:', e);
+    }
     setUser(null);
     setProfile(null);
+    setProfileLoadFailed(false);
+    setProfileError(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, logout, updateAvatar, fetchUserProfile }}>
+    <AuthContext.Provider value={{
+      user,
+      profile,
+      loading,
+      profileLoadFailed,
+      profileError,
+      retryProfile,
+      login,
+      logout,
+      updateAvatar,
+      fetchUserProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   );
