@@ -580,6 +580,7 @@ export const League1v1Page = () => {
  .from('vsp_1v1_tournament_players')
  .select('*')
  .eq('tournament_id', tourn.id)
+ .eq('payment_status', 'paid')
  .order('total_points', { ascending: false });
 
  if (error) throw error;
@@ -601,9 +602,6 @@ export const League1v1Page = () => {
   return (Number(p.tackles) || 0) + (Number(p.goals) || 0) + (Number(p.skills ?? p.skill_points) || 0);
  };
 
- const hasTopTie = sortedPlayersPreview.length >= 2 &&
-  getPlayerScore(sortedPlayersPreview[0]) > 0 &&
-  getPlayerScore(sortedPlayersPreview[0]) === getPlayerScore(sortedPlayersPreview[1]);
 
  return (
  <div className="p-6 space-y-6 text-right max-w-7xl mx-auto" dir="rtl">
@@ -914,10 +912,10 @@ export const League1v1Page = () => {
 
  <button
  onClick={handleInitiatePublish}
- disabled={processing || hasTopTie || players.length < 2}
- title={hasTopTie ? 'يجب حسم التعادل في المركز الأول أولاً' : ''}
+ disabled={processing || players.filter(p => p.payment_status === 'paid').length < 2}
+ title="اختر بطل البطولة الفعلي؛ التعادل في النقاط لا يمنع الاعتماد"
  className={`flex items-center gap-2 px-6 py-2.5 font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 ${
-  hasTopTie || players.length < 2
+  players.filter(p => p.payment_status === 'paid').length < 2
    ? 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-75'
    : 'bg-zinc-100 hover:bg-white text-black'
  }`}
