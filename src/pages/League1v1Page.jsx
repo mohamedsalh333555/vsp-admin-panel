@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   Cup,
   Profile2User,
@@ -84,6 +84,7 @@ export const League1v1Page = () => {
  const [activeTournament, setActiveTournament] = useState(null);
  const [players, setPlayers] = useState([]);
  const [selectedChampionUserId, setSelectedChampionUserId] = useState('');
+ const autoSaveTimer = useRef(null);
 
  // Modal State for New Tournament
  const [showNewModal, setShowNewModal] = useState(false);
@@ -286,6 +287,28 @@ export const League1v1Page = () => {
    setProcessing(false);
   }
  };
+
+ useEffect(() => {
+   if (!isDirty || !activeTournament?.id || players.length === 0) return;
+   if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+   autoSaveTimer.current = setTimeout(async () => {
+     const cleanPlayers = players.map((p, idx) => ({
+       player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
+       user_id: p.user_id || null,
+       avatar_url: p.avatar_url || null,
+       tackles: Math.max(0, parseInt(p.tackles) || 0),
+       goals: Math.max(0, parseInt(p.goals) || 0),
+       skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+       rounds_played: Math.max(0, parseInt(p.rounds_played) || 0),
+       round_reached: p.round_reached ? p.round_reached.trim() : null,
+     }));
+     const res = await adminService.save1v1TournamentPlayers(activeTournament.id, cleanPlayers);
+     if (res.success) setIsDirty(false);
+   }, 900);
+   return () => {
+     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+   };
+ }, [players, isDirty, activeTournament?.id]);
 
  // -------------------------------------------------------------------------
  // 2. LIVE SCORING SHEET ROW ACTIONS
