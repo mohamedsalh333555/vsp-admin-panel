@@ -498,6 +498,7 @@ export const League1v1Page = () => {
         tackles: Math.max(0, parseInt(p.tackles) || 0),
         goals: Math.max(0, parseInt(p.goals) || 0),
         skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+        rounds_played: Math.max(0, parseInt(p.rounds_played) || 0),
         round_reached: p.round_reached ? p.round_reached.trim() : null,
       }));
 
@@ -1064,18 +1065,6 @@ export const League1v1Page = () => {
      ))}
    </select>
  </div>
-
- {/* Tie-Break Critical Alert */}
- {hasTopTie && (
- <div className="p-4 bg-amber-500/15 border-2 border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 text-amber-300 shadow-lg">
- <div className="flex items-center gap-3 text-xs font-bold leading-relaxed">
- <Warning2 className="w-5 h-5 text-amber-400 flex-shrink-0 animate-pulse" variant="Outline" />
- <span>
- ⚠️ تنبيه حرج (تعادل في المركز الأول): اللاعبان <strong className="text-white">"{sortedPlayersPreview[0]?.player_name}"</strong> و <strong className="text-white">"{sortedPlayersPreview[1]?.player_name}"</strong> متعادلان برصيد ({getPlayerScore(sortedPlayersPreview[0])} نقطة)! يرجى حسم التعادل وتعديل النقاط لتحديد البطل قبل إتاحة اعتماد ونشر الترتيب.
- </span>
- </div>
- </div>
- )}
 
  {/* Live Bulk Scoring Table */}
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
