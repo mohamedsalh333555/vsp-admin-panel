@@ -997,6 +997,31 @@ class AdminService {
   }
 
 
+  async update1v1Tournament({ tournamentId, name, targetPlayerCount, entryFee, scheduledAt, governorate }) {
+    try {
+      if (!tournamentId || !name?.trim()) {
+        return { success: false, error: 'معرف البطولة واسم البطولة مطلوبان.' };
+      }
+
+      const { data, error } = await this.client.rpc('admin_update_1v1_tournament_atomic', {
+        p_tournament_id: tournamentId,
+        p_name: name.trim(),
+        p_target_player_count: Number.isFinite(Number(targetPlayerCount)) ? Number(targetPlayerCount) : null,
+        p_entry_fee: Number.isFinite(Number(entryFee)) ? Number(entryFee) : null,
+        p_scheduled_at: scheduledAt || null,
+        p_governorate: governorate?.trim() || null,
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل تعديل بطولة 1v1');
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error updating 1v1 tournament:', e);
+      const err = classifyError(e);
+      return { success: false, error: err.message, errorType: err.type };
+    }
+  }
+
   async mark1v1PrizeDelivered(tournamentId, notes = '') {
     try {
       const { data, error } = await this.client.rpc('mark_1v1_prize_delivered_atomic', {
