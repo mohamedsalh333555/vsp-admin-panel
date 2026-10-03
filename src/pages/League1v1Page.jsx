@@ -23,6 +23,7 @@ import {
   Award,
   Location,
   Filter,
+  Edit2,
 } from 'iconsax-react';
 
 export const EGYPT_GOVERNORATES = [
@@ -86,6 +87,12 @@ export const League1v1Page = () => {
 
  // Modal State for New Tournament
  const [showNewModal, setShowNewModal] = useState(false);
+ const [showEditModal, setShowEditModal] = useState(false);
+ const [editTournamentName, setEditTournamentName] = useState('');
+ const [editPlayerCount, setEditPlayerCount] = useState('');
+ const [editEntryFee, setEditEntryFee] = useState('');
+ const [editScheduledAt, setEditScheduledAt] = useState('');
+ const [editGovernorate, setEditGovernorate] = useState('');
  const [tournamentName, setTournamentName] = useState('');
  const [playerCountInput, setPlayerCountInput] = useState('32');
  const [scheduledAtInput, setScheduledAtInput] = useState(() => {
@@ -287,6 +294,54 @@ export const League1v1Page = () => {
 
  // -------------------------------------------------------------------------
  // 2. LIVE SCORING SHEET ROW ACTIONS
+ const handleOpenEditTournamentModal = () => {
+  if (!activeTournament?.id) return;
+  if (['completed', 'published', 'archived', 'cancelled'].includes(activeTournament.status)) {
+   setAlert({ type: 'error', message: 'لا يمكن تعديل بطولة نهائية أو ملغاة.' });
+   return;
+  }
+
+  const hasPlayers = players.length > 0;
+  const scheduled = activeTournament.scheduled_at
+   ? new Date(activeTournament.scheduled_at)
+   : null;
+
+  setEditTournamentName(activeTournament.name || '');
+  setEditPlayerCount(String(activeTournament.target_player_count || players.length || 2));
+  setEditEntryFee(String(activeTournament.entry_fee ?? 0));
+  setEditScheduledAt(scheduled ? new Date(scheduled.getTime() - scheduled.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
+  setEditGovernorate(activeTournament.governorate || selectedGovernorate || 'Cairo');
+  setShowEditModal(true);
+ };
+
+ const handleSaveTournamentEdit = async (e) => {
+  e.preventDefault();
+  if (!activeTournament?.id) return;
+
+  try {
+   setProcessing(true);
+   const res = await adminService.update1v1Tournament({
+    tournamentId: activeTournament.id,
+    name: editTournamentName,
+    targetPlayerCount: editPlayerCount,
+    entryFee: editEntryFee,
+    scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
+    governorate: editGovernorate,
+   });
+
+   if (!res.success) throw new Error(res.error || 'فشل تعديل البطولة');
+
+   setShowEditModal(false);
+   setAlert({ type: 'success', message: 'تم تعديل بيانات بطولة 1 ضد 1 وحفظها بنجاح.' });
+   await loadData(selectedGovernorate);
+  } catch (e) {
+   setAlert({ type: 'error', message: e.message || 'فشل تعديل البطولة' });
+  } finally {
+   setProcessing(false);
+  }
+ };
+
+
  // -------------------------------------------------------------------------
  const handlePlayerChange = (index, field, value) => {
   setIsDirty(true);
@@ -857,6 +912,15 @@ export const League1v1Page = () => {
 
      {/* Bulk Save & Publish Controls */}
  <div className="flex items-center gap-3">
+ <button
+ onClick={handleOpenEditTournamentModal}
+ disabled={processing || ['completed', 'published', 'archived', 'cancelled'].includes(activeTournament.status)}
+ className="flex items-center gap-2 px-4 py-2.5 bg-vsp-card hover:bg-vsp-border border border-vsp-border text-zinc-200 text-xs font-bold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+ title="تعديل بيانات البطولة"
+ >
+ <Edit2 className="w-4 h-4 text-zinc-300" variant="Outline" />
+ <span>تعديل البطولة</span>
+ </button>
  {activeTournament.status === 'registration_open' && (
  <button
  onClick={() => handleToggleStatus('in_progress')}
@@ -1378,6 +1442,104 @@ export const League1v1Page = () => {
  )}
  </div>
  )}
+
+ {/* ==================================================================== */}
+ {/* MODAL: EDIT 1v1 TOURNAMENT */}
+ {/* ==================================================================== */}
+ <Modal
+  isOpen={showEditModal}
+  onClose={() => setShowEditModal(false)}
+  title="تعديل بطولة 1 ضد 1"
+ >
+  <form onSubmit={handleSaveTournamentEdit} className="space-y-4 text-right" dir="rtl">
+   <div className="p-3.5 bg-vsp-card border border-vsp-border rounded-xl text-zinc-300 text-xs leading-relaxed">
+    يمكنك تعديل بيانات البطولة قبل اعتمادها نهائياً. إذا كان هناك لاعبون مسجلون بالفعل، سيتم السماح بتعديل <strong className="text-white">الاسم والموعد فقط</strong> لحماية المقاعد والمدفوعات.
+   </div>
+
+   <div>
+    <label className="block text-xs font-bold text-zinc-300 mb-1.5">اسم / عنوان البطولة</label>
+    <input
+     type="text"
+     value={editTournamentName}
+     onChange={(e) => setEditTournamentName(e.target.value)}
+     className="w-full bg-vsp-card border border-vsp-border rounded-xl px-4 py-2.5 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none"
+     required
+    />
+   </div>
+
+   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div>
+     <label className="block text-xs font-bold text-zinc-300 mb-1.5">عدد اللاعبين المستهدف</label>
+     <input
+      type="number"
+      min="2"
+      max="128"
+      value={editPlayerCount}
+      onChange={(e) => setEditPlayerCount(e.target.value)}
+      disabled={players.length > 0}
+      className="w-full bg-vsp-card border border-vsp-border rounded-xl px-4 py-2.5 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none disabled:opacity-40"
+      required
+     />
+    </div>
+    <div>
+     <label className="block text-xs font-bold text-zinc-300 mb-1.5">رسوم الاشتراك (ج.م)</label>
+     <input
+      type="number"
+      min="0"
+      step="5"
+      value={editEntryFee}
+      onChange={(e) => setEditEntryFee(e.target.value)}
+      disabled={players.length > 0}
+      className="w-full bg-vsp-card border border-vsp-border rounded-xl px-4 py-2.5 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none disabled:opacity-40"
+      required
+     />
+    </div>
+   </div>
+
+   <div>
+    <label className="block text-xs font-bold text-zinc-300 mb-1.5">موعد وتوقيت البطولة</label>
+    <input
+     type="datetime-local"
+     value={editScheduledAt}
+     onChange={(e) => setEditScheduledAt(e.target.value)}
+     className="w-full bg-vsp-card border border-vsp-border rounded-xl px-4 py-2.5 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none"
+     required
+    />
+   </div>
+
+   <div>
+    <label className="block text-xs font-bold text-zinc-300 mb-1.5">المحافظة المستهدفة</label>
+    <select
+     value={editGovernorate}
+     onChange={(e) => setEditGovernorate(e.target.value)}
+     disabled={players.length > 0}
+     className="w-full bg-vsp-card border border-vsp-border rounded-xl px-4 py-2.5 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none disabled:opacity-40"
+    >
+     {EGYPT_GOVERNORATES.map((g) => (
+      <option key={g.id} value={g.id} className="bg-zinc-900 text-white">{g.name} ({g.id})</option>
+     ))}
+    </select>
+   </div>
+
+   <div className="flex items-center justify-end gap-3 pt-4 border-t border-vsp-border">
+    <button
+     type="button"
+     onClick={() => setShowEditModal(false)}
+     className="px-4 py-2 bg-vsp-card hover:bg-vsp-surface border border-vsp-border text-white text-xs font-bold rounded-xl"
+    >
+     إلغاء
+    </button>
+    <button
+     type="submit"
+     disabled={processing}
+     className="flex items-center gap-2 px-5 py-2 bg-zinc-100 hover:bg-white text-black font-extrabold text-xs rounded-xl shadow-md transition-all disabled:opacity-50"
+    >
+     {processing && <RotateRight className="w-4 h-4 animate-spin" variant="Outline" />}
+     <span>حفظ التعديلات</span>
+    </button>
+   </div>
+  </form>
+ </Modal>
 
  {/* ==================================================================== */}
  {/* MODAL: START NEW TOURNAMENT (تحديد عدد اللاعبين يدوياً) */}
