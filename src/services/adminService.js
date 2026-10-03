@@ -1028,6 +1028,7 @@ class AdminService {
           tackles: Math.max(0, Number(p.tackles) || 0),
           goals: Math.max(0, Number(p.goals) || 0),
           skills: Math.max(0, Number(p.skills ?? p.skill_points) || 0),
+          rounds_played: Math.max(0, Number(p.rounds_played) || 0),
           round_reached: p.round_reached ? String(p.round_reached).trim() : null,
         })),
       });
@@ -1076,6 +1077,21 @@ class AdminService {
     }
   }
 
+
+  async finalize1v1Tournament(tournamentId, championUserId) {
+    try {
+      const { data, error } = await this.client.rpc('admin_finalize_1v1_tournament_atomic', {
+        p_tournament_id: tournamentId,
+        p_champion_user_id: championUserId,
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل اعتماد بطل البطولة');
+      return { success: true, data };
+    } catch (e) {
+      console.error('Error finalizing 1v1 tournament:', e);
+      return { success: false, error: e.message || 'فشل اعتماد بطل البطولة' };
+    }
+  }
 
   async update1v1TournamentStatus(tournamentId, status) {
     try {
@@ -1142,6 +1158,7 @@ class AdminService {
         .from('vsp_1v1_tournament_players')
         .select('*')
         .eq('tournament_id', tournament.id)
+        .eq('payment_status', 'paid')
         .order('total_points', { ascending: false });
 
       if (pErr) throw pErr;

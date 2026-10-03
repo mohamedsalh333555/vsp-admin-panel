@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   Cup,
   Profile2User,
@@ -83,6 +83,8 @@ export const League1v1Page = () => {
  // Active Tournament State
  const [activeTournament, setActiveTournament] = useState(null);
  const [players, setPlayers] = useState([]);
+ const [selectedChampionUserId, setSelectedChampionUserId] = useState('');
+ const autoSaveTimer = useRef(null);
 
  // Modal State for New Tournament
  const [showNewModal, setShowNewModal] = useState(false);
@@ -138,6 +140,7 @@ export const League1v1Page = () => {
    if (res.success) {
     setActiveTournament(res.tournament);
     setPlayers(res.players || []);
+    setSelectedChampionUserId(res.tournament?.champion_user_id || '');
    } else {
     setActiveTournament(null);
     setPlayers([]);
@@ -285,6 +288,28 @@ export const League1v1Page = () => {
   }
  };
 
+ useEffect(() => {
+   if (!isDirty || !activeTournament?.id || players.length === 0) return;
+   if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+   autoSaveTimer.current = setTimeout(async () => {
+     const cleanPlayers = players.map((p, idx) => ({
+       player_name: (p.player_name || p.name || `لاعب #${idx + 1}`).trim(),
+       user_id: p.user_id || null,
+       avatar_url: p.avatar_url || null,
+       tackles: Math.max(0, parseInt(p.tackles) || 0),
+       goals: Math.max(0, parseInt(p.goals) || 0),
+       skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+       rounds_played: Math.max(0, parseInt(p.rounds_played) || 0),
+       round_reached: p.round_reached ? p.round_reached.trim() : null,
+     }));
+     const res = await adminService.save1v1TournamentPlayers(activeTournament.id, cleanPlayers);
+     if (res.success) setIsDirty(false);
+   }, 900);
+   return () => {
+     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+   };
+ }, [players, isDirty, activeTournament?.id]);
+
  // -------------------------------------------------------------------------
  // 2. LIVE SCORING SHEET ROW ACTIONS
  // -------------------------------------------------------------------------
@@ -329,6 +354,7 @@ export const League1v1Page = () => {
   skills: 0,
   skill_points: 0,
   total_points: 0,
+  rounds_played: 0,
   round_reached: '',
   user_id: null,
   avatar_url: '',
@@ -444,6 +470,7 @@ export const League1v1Page = () => {
         tackles: Math.max(0, parseInt(p.tackles) || 0),
         goals: Math.max(0, parseInt(p.goals) || 0),
         skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+        rounds_played: Math.max(0, parseInt(p.rounds_played) || 0),
         round_reached: p.round_reached ? p.round_reached.trim() : null,
       }));
 
@@ -472,11 +499,8 @@ export const League1v1Page = () => {
       setAlert({ type: 'error', message: 'يجب أن تحتوي البطولة على لاعبين اثنين على الأقل لنشر النتائج.' });
       return;
     }
-    if (hasTopTie) {
-      setAlert({
-        type: 'error',
-        message: '⚠️ لا يمكن اعتماد ونشر النتائج لوجود تعادل في المركز الأول! يرجى حسم التعادل وتعديل النقاط أولاً.',
-      });
+    if (!selectedChampionUserId) {
+      setAlert({ type: 'error', message: 'اختر بطل البطولة الفعلي أولاً قبل الاعتماد النهائي.' });
       return;
     }
     setPublishConfirmedCheckbox(false);
@@ -497,17 +521,21 @@ export const League1v1Page = () => {
         tackles: Math.max(0, parseInt(p.tackles) || 0),
         goals: Math.max(0, parseInt(p.goals) || 0),
         skills: Math.max(0, parseInt(p.skills ?? p.skill_points) || 0),
+        rounds_played: Math.max(0, parseInt(p.rounds_played) || 0),
         round_reached: p.round_reached ? p.round_reached.trim() : null,
       }));
 
-      const pubRes = await adminService.saveAndPublish1v1Tournament({
-        tournamentId: activeTournament.id,
-        playersList: cleanPlayers,
-        fallbackStatus: previousStatus,
-      });
+      const saveRes = await adminService.save1v1TournamentPlayers(activeTournament.id, cleanPlayers);
+      if (!saveRes.success) {
+        throw new Error(saveRes.error || 'فشل حفظ نتائج اللاعبين');
+      }
 
-      if (!pubRes.success) {
-        throw new Error(pubRes.error || 'فشل نشر البطولة');
+      const finalRes = await adminService.finalize1v1Tournament(
+        activeTournament.id,
+        selectedChampionUserId,
+      );
+      if (!finalRes.success) {
+        throw new Error(finalRes.error || 'فشل اعتماد بطل البطولة');
       }
 
       if (prizeDeliveryInput && prizeDeliveryInput.trim()) {
@@ -552,6 +580,7 @@ export const League1v1Page = () => {
  .from('vsp_1v1_tournament_players')
  .select('*')
  .eq('tournament_id', tourn.id)
+ .eq('payment_status', 'paid')
  .order('total_points', { ascending: false });
 
  if (error) throw error;
@@ -573,9 +602,6 @@ export const League1v1Page = () => {
   return (Number(p.tackles) || 0) + (Number(p.goals) || 0) + (Number(p.skills ?? p.skill_points) || 0);
  };
 
- const hasTopTie = sortedPlayersPreview.length >= 2 &&
-  getPlayerScore(sortedPlayersPreview[0]) > 0 &&
-  getPlayerScore(sortedPlayersPreview[0]) === getPlayerScore(sortedPlayersPreview[1]);
 
  return (
  <div className="p-6 space-y-6 text-right max-w-7xl mx-auto" dir="rtl">
@@ -886,10 +912,10 @@ export const League1v1Page = () => {
 
  <button
  onClick={handleInitiatePublish}
- disabled={processing || hasTopTie || players.length < 2}
- title={hasTopTie ? 'يجب حسم التعادل في المركز الأول أولاً' : ''}
+ disabled={processing || players.filter(p => p.payment_status === 'paid').length < 2}
+ title="اختر بطل البطولة الفعلي؛ التعادل في النقاط لا يمنع الاعتماد"
  className={`flex items-center gap-2 px-6 py-2.5 font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 ${
-  hasTopTie || players.length < 2
+  players.filter(p => p.payment_status === 'paid').length < 2
    ? 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-75'
    : 'bg-zinc-100 hover:bg-white text-black'
  }`}
@@ -1040,17 +1066,26 @@ export const League1v1Page = () => {
  </button>
  </div>
 
- {/* Tie-Break Critical Alert */}
- {hasTopTie && (
- <div className="p-4 bg-amber-500/15 border-2 border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 text-amber-300 shadow-lg">
- <div className="flex items-center gap-3 text-xs font-bold leading-relaxed">
- <Warning2 className="w-5 h-5 text-amber-400 flex-shrink-0 animate-pulse" variant="Outline" />
- <span>
- ⚠️ تنبيه حرج (تعادل في المركز الأول): اللاعبان <strong className="text-white">"{sortedPlayersPreview[0]?.player_name}"</strong> و <strong className="text-white">"{sortedPlayersPreview[1]?.player_name}"</strong> متعادلان برصيد ({getPlayerScore(sortedPlayersPreview[0])} نقطة)! يرجى حسم التعادل وتعديل النقاط لتحديد البطل قبل إتاحة اعتماد ونشر الترتيب.
- </span>
+ {/* Explicit Champion Selection */}
+ <div className="p-4 bg-vsp-card/60 border border-vsp-border rounded-2xl space-y-3">
+   <div className="flex items-center justify-between gap-3">
+     <div>
+       <div className="text-sm font-black text-white">بطل البطولة الفعلي</div>
+       <div className="text-[11px] text-zinc-400 mt-1">النقاط ترتيب إحصائي فقط؛ البطل هو من فاز بالبطولة فعليًا.</div>
+     </div>
+     <Award className="w-5 h-5 text-vsp-accent" variant="Outline" />
+   </div>
+   <select
+     value={selectedChampionUserId}
+     onChange={(e) => { setSelectedChampionUserId(e.target.value); setIsDirty(true); }}
+     className="w-full bg-vsp-surface border border-vsp-border rounded-xl px-3 py-2.5 text-white text-xs font-bold focus:border-vsp-accent focus:outline-none"
+   >
+     <option value="">اختر اللاعب الفائز بالنهائي</option>
+     {players.filter((p) => p.user_id && p.payment_status === 'paid').map((p) => (
+       <option key={p.user_id} value={p.user_id}>{p.player_name || p.name}</option>
+     ))}
+   </select>
  </div>
- </div>
- )}
 
  {/* Live Bulk Scoring Table */}
  <div className="bg-vsp-surface border border-vsp-border rounded-2xl overflow-hidden shadow-xl">
@@ -1060,6 +1095,7 @@ export const League1v1Page = () => {
  <tr>
  <th className="px-5 py-4 font-bold text-center w-14">#</th>
  <th className="px-5 py-4 font-bold min-w-[200px]">اسم اللاعب</th>
+ <th className="px-5 py-4 font-bold text-center min-w-[100px]">عدد الجولات</th>
  <th className="px-5 py-4 font-bold text-center min-w-[110px]">
  <div className="flex items-center justify-center gap-1 text-cyan-400">
  <ShieldTick className="w-3.5 h-3.5" variant="Outline" />
@@ -1104,6 +1140,17 @@ export const League1v1Page = () => {
  onChange={(e) => handlePlayerChange(idx, 'player_name', e.target.value)}
  placeholder={`اسم اللاعب #${idx + 1}`}
  className="w-full bg-vsp-card border border-vsp-border rounded-xl px-3.5 py-2 text-white font-bold text-xs focus:border-vsp-accent focus:outline-none transition-all"
+ />
+ </td>
+
+ {/* Rounds Input */}
+ <td className="px-5 py-3.5 text-center">
+ <input
+ type="number"
+ min="0"
+ value={p.rounds_played || 0}
+ onChange={(e) => handlePlayerChange(idx, 'rounds_played', e.target.value)}
+ className="w-20 bg-vsp-card border border-vsp-border rounded-xl px-2.5 py-2 text-center text-white font-black text-xs focus:border-vsp-accent focus:outline-none"
  />
  </td>
 
@@ -1597,10 +1644,10 @@ export const League1v1Page = () => {
  <span className="font-bold text-white">{activeTournament.name} ({getGovArabicName(activeTournament.governorate)})</span>
  </div>
  <div className="flex justify-between items-center text-xs">
- <span className="text-zinc-400">البطل المتوج بالمركز الأول:</span>
+ <span className="text-zinc-400">بطل البطولة المختار:</span>
  <span className="font-black text-vsp-accent flex items-center gap-1.5">
  <Award className="w-4 h-4 text-vsp-accent" variant="Outline" />
- {sortedPlayersPreview[0]?.player_name} ({getPlayerScore(sortedPlayersPreview[0])} نقطة)
+ {players.find((p) => p.user_id === selectedChampionUserId)?.player_name || 'لم يتم الاختيار بعد'}
  </span>
  </div>
  <div className="flex justify-between items-center text-xs">
